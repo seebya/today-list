@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>T O D A Y</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="paper-overlay"></div>
+  <div class="fold"></div>
+
+  <main class="paper">
+    <header>
+      <h1>T O D A Y</h1>
+      <p id="date"></p>
+    </header>
+
+    <ul id="task-list"></ul>
+
+    <input type="text" id="task-input" autocomplete="off" spellcheck="false" />
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://azitxesbwldyqfpqylby.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_LishKGyfBaBZHyzs4uJ23Q_8rxWCq3a';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const d = new Date();
+    const todayStr = d.toISOString().slice(0, 10);
+    const tomorrowD = new Date(d);
+    tomorrowD.setDate(tomorrowD.getDate() + 1);
+    const tomorrowStr = tomorrowD.toISOString().slice(0, 10);
+    const yesterdayD = new Date(d);
+    yesterdayD.setDate(yesterdayD.getDate() - 1);
+    const yesterdayStr = yesterdayD.toISOString().slice(0, 10);
+
+    function fmtDisplay(isoStr) {
+      return isoStr.replace(/-/g, ' ');
+    }
+
+    document.getElementById('date').textContent = fmtDisplay(todayStr);
+
+    const input = document.getElementById('task-input');
+    const list = document.getElementById('task-list');
+    const fold = document.querySelector('.fold');
+    const header = document.querySelector('header h1');
+    const dateEl = document.getElementById('date');
+
+    let view = 'today';
+    let userId = null;
+
+    async function init() {
+      let { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        const { data } = await sb.auth.signInAnonymously();
+        session = data.session;
+      }
+      userId = session.user.id;
+
+      // Roll over yesterday's uncompleted tasks
+      await sb.from('tasks')
+        .update({ day: todayStr, rolled_over: true })
+        .eq('user_id', userId)
+        .eq('day', yesterdayStr)
+        .eq('crossed_off', false);
+
+      await renderToday();
+    }
+
+    async function renderToday() {
+      view = 'today';
+      header.textContent = 'T O D A Y';
+      dateEl.textContent = fmtDisplay(todayStr);
+      input.style.display = '';
+      list.innerHTML = '';
+
+      const { data: tasks } = await sb.from('tasks')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('day', todayStr)
+        .order('rolled_over', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      (tasks || []).forEach(task => list.appendChild(makeTask(task, 'today')));
+    }
+
+    async function renderTomorrow() {
+      view = 'tomorrow';
+      header.textContent = 'T O M O R R O W';
+      dateEl.textContent = fmtDisplay(tomorrowStr);
+      input.style.display = 'none';
+      list.innerHTML = '';
+
+      const { data: tasks } = await sb.from('tasks')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('day', tomorrowStr)
+        .order('created_at', { ascending: true });
+
+      (tasks || []).forEach(task => list.appendChild(makeTask(task, 'tomorrow')));
+    }
+
+    fold.addEventListener('click', () => {
+      if (view === 'today') renderTomorrow();
+      else renderToday();
+    });
+
+    function crossOff(li, task) {
+      const span = li.querySelector('span');
+      const nowCrossed = !li.classList.contains('crossed');
+
+      sb.from('tasks').update({ crossed_off: nowCrossed }).eq('id', task.id);
+
+      if (!nowCrossed) {
+        li.classList.remove('crossed');
+        const svg = li.querySelector('svg');
+        if (svg) svg.remove();
+        return;
+      }
+
+      li.classList.add('crossed');
+
+      const width = span.offsetWidth;
+      const tiltY = (Math.random() * 6 - 3);
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.style.cssText = `position:absolute;top:50%;left:0;width:${width}px;height:14px;transform:translateY(-50%);pointer-events:none;overflow:visible;`;
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', '0');
+      line.setAttribute('y1', '7');
+      line.setAttribute('x2', width);
+      line.setAttribute('y2', 7 + tiltY);
+      line.setAttribute('stroke', '#1e451d');
+      line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('stroke-linecap', 'round');
+      line.style.strokeDasharray = width;
+      line.style.strokeDashoffset = width;
+      line.style.transition = 'stroke-dashoffset 0.35s ease';
+
+      svg.appendChild(line);
+      li.appendChild(svg);
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        line.style.strokeDashoffset = '0';
+      }));
+    }
+
+    function fadeOut(li, cb) {
+      li.style.transition = 'opacity 200ms ease';
+      li.style.opacity = '0';
+      setTimeout(cb, 210);
+    }
+
+    function pushToTomorrow(li, task) {
+      fadeOut(li, async () => {
+        await sb.from('tasks').update({ day: tomorrowStr, rolled_over: false }).eq('id', task.id);
+        li.remove();
+      });
+    }
+
+    function pullToToday(li, task) {
+      fadeOut(li, async () => {
+        await sb.from('tasks').update({ day: todayStr }).eq('id', task.id);
+        li.remove();
+      });
+    }
+
+    function makeTask(task, context) {
+      const li = document.createElement('li');
+      li.className = 'task-item';
+      if (task.crossed_off) li.classList.add('crossed');
+      const span = document.createElement('span');
+      span.textContent = task.task_name;
+      li.appendChild(span);
+
+      if (task.crossed_off) {
+        // Restore strikethrough line without animation
+        requestAnimationFrame(() => {
+          const width = span.offsetWidth;
+          const tiltY = (Math.random() * 6 - 3);
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.style.cssText = `position:absolute;top:50%;left:0;width:${width}px;height:14px;transform:translateY(-50%);pointer-events:none;overflow:visible;`;
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', '0');
+          line.setAttribute('y1', '7');
+          line.setAttribute('x2', width);
+          line.setAttribute('y2', 7 + tiltY);
+          line.setAttribute('stroke', '#1e451d');
+          line.setAttribute('stroke-width', '1.5');
+          line.setAttribute('stroke-linecap', 'round');
+          svg.appendChild(line);
+          li.appendChild(svg);
+        });
+      }
+
+      let touchStartX = 0;
+      let touchStartY = 0;
+
+      li.addEventListener('touchstart', e => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }, { passive: true });
+
+      li.addEventListener('touchend', e => {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dy) > Math.abs(dx)) return;
+        if (context === 'today') {
+          if (dx < -50) crossOff(li, task);
+          if (dx > 50) pushToTomorrow(li, task);
+        } else {
+          if (dx > 50) pullToToday(li, task);
+        }
+      });
+
+      if (context === 'today') {
+        li.addEventListener('click', () => crossOff(li, task));
+        li.addEventListener('contextmenu', e => {
+          e.preventDefault();
+          pushToTomorrow(li, task);
+        });
+      } else {
+        li.addEventListener('click', () => pullToToday(li, task));
+      }
+
+      return li;
+    }
+
+    input.addEventListener('keydown', async function(e) {
+      if (e.key !== 'Enter') return;
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+
+      const { data: inserted, error } = await sb.from('tasks')
+        .insert({ user_id: userId, task_name: text, crossed_off: false, day: todayStr, rolled_over: false })
+        .select()
+        .single();
+
+      if (error) { console.error('insert error:', error); return; }
+      if (inserted) list.appendChild(makeTask(inserted, 'today'));
+    });
+
+    init();
+  </script>
+</body>
+</html>
