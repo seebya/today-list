@@ -24,6 +24,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script>
     const SUPABASE_URL = 'https://azitxesbwldyqfpqylby.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_LishKGyfBaBZHyzs4uJ23Q_8rxWCq3a';
@@ -52,6 +53,7 @@
 
     let view = 'today';
     let userId = null;
+    let sortableInstance = null;
 
     async function init() {
       let { data: { session } } = await sb.auth.getSession();
@@ -82,10 +84,18 @@
         .select('*')
         .eq('user_id', userId)
         .eq('day', todayStr)
+        .order('position', { ascending: true })
         .order('rolled_over', { ascending: false })
         .order('created_at', { ascending: true });
 
-      (tasks || []).forEach(task => list.appendChild(makeTask(task, 'today')));
+      const loaded = tasks || [];
+      if (loaded.some(t => t.position == null)) {
+        await Promise.all(loaded.map((t, i) =>
+          sb.from('tasks').update({ position: i }).eq('id', t.id)
+        ));
+      }
+      loaded.forEach(task => list.appendChild(makeTask(task, 'today')));
+      initSortable();
     }
 
     async function renderTomorrow() {
@@ -99,15 +109,42 @@
         .select('*')
         .eq('user_id', userId)
         .eq('day', tomorrowStr)
+        .order('position', { ascending: true })
         .order('created_at', { ascending: true });
 
-      (tasks || []).forEach(task => list.appendChild(makeTask(task, 'tomorrow')));
+      const loaded = tasks || [];
+      if (loaded.some(t => t.position == null)) {
+        await Promise.all(loaded.map((t, i) =>
+          sb.from('tasks').update({ position: i }).eq('id', t.id)
+        ));
+      }
+      loaded.forEach(task => list.appendChild(makeTask(task, 'tomorrow')));
+      initSortable();
     }
 
     fold.addEventListener('click', () => {
       if (view === 'today') renderTomorrow();
       else renderToday();
     });
+
+    function initSortable() {
+      if (sortableInstance) sortableInstance.destroy();
+      sortableInstance = Sortable.create(list, {
+        animation: 150,
+        ghostClass: 'task-ghost',
+        chosenClass: 'task-chosen',
+        delay: 200,
+        delayOnTouchOnly: true,
+        onEnd: saveOrder
+      });
+    }
+
+    async function saveOrder() {
+      const items = [...list.querySelectorAll('.task-item[data-id]')];
+      await Promise.all(items.map((el, i) =>
+        sb.from('tasks').update({ position: i }).eq('id', el.dataset.id)
+      ));
+    }
 
     function crossOff(li, task) {
       const span = li.querySelector('span');
@@ -173,6 +210,7 @@
     function makeTask(task, context) {
       const li = document.createElement('li');
       li.className = 'task-item';
+      li.dataset.id = task.id;
       if (task.crossed_off) li.classList.add('crossed');
       const span = document.createElement('span');
       span.textContent = task.task_name;
@@ -238,7 +276,7 @@
       input.value = '';
 
       const { data: inserted, error } = await sb.from('tasks')
-        .insert({ user_id: userId, task_name: text, crossed_off: false, day: todayStr, rolled_over: false })
+        .insert({ user_id: userId, task_name: text, crossed_off: false, day: todayStr, rolled_over: false, position: list.querySelectorAll('.task-item').length })
         .select()
         .single();
 
