@@ -245,6 +245,45 @@ header p {
   overflow: visible;
 }
 
+.task-menu {
+  position: fixed;
+  background: #f7f4e9;
+  border: 1px solid rgba(30, 69, 29, 0.18);
+  z-index: 500;
+  padding: 0.3rem 0;
+  min-width: 160px;
+  box-shadow: 0 2px 16px rgba(30, 69, 29, 0.1);
+}
+
+.task-menu button {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.78rem;
+  color: #1e451d;
+  padding: 0.5rem 1rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-menu button:hover { background: rgba(30, 69, 29, 0.05); }
+
+.task-edit-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(30, 69, 29, 0.35);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: #1e451d;
+  caret-color: #142e13;
+  outline: none;
+  width: 100%;
+  padding: 0;
+}
+
 #task-input {
   display: block;
   width: 100%;

@@ -56,6 +56,12 @@
     <input type="text" id="task-input" autocomplete="off" spellcheck="false" />
   </main>
 
+  <div id="task-menu" class="task-menu hidden">
+    <button id="menu-edit">edit</button>
+    <button id="menu-delete">delete</button>
+    <button id="menu-push">push to tomorrow</button>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script>
@@ -504,10 +510,10 @@
 
       if (context === 'today') {
         li.addEventListener('click', () => crossOff(li, task));
-        li.addEventListener('contextmenu', e => { e.preventDefault(); pushToTomorrow(li, task); });
       } else {
         li.addEventListener('click', () => pullToToday(li, task));
       }
+      li.addEventListener('contextmenu', e => showTaskMenu(e, li, task, context));
 
       return li;
     }
@@ -539,6 +545,113 @@
       }
       if (inserted) list.appendChild(makeTask(inserted, 'today'));
     });
+
+    // ── Context menu ──────────────────────────────────────────────────────────
+
+    let menuTarget = null;
+    const taskMenu = document.getElementById('task-menu');
+
+    function showTaskMenu(e, li, task, context) {
+      e.preventDefault();
+      menuTarget = { li, task, context };
+      document.getElementById('menu-push').textContent =
+        context === 'today' ? 'push to tomorrow' : 'pull to today';
+      taskMenu.classList.remove('hidden');
+      let x = e.clientX, y = e.clientY;
+      taskMenu.style.left = x + 'px';
+      taskMenu.style.top  = y + 'px';
+      requestAnimationFrame(() => {
+        const r = taskMenu.getBoundingClientRect();
+        if (r.right  > window.innerWidth)  taskMenu.style.left = (x - r.width)  + 'px';
+        if (r.bottom > window.innerHeight) taskMenu.style.top  = (y - r.height) + 'px';
+      });
+    }
+
+    function hideTaskMenu() {
+      taskMenu.classList.add('hidden');
+      menuTarget = null;
+    }
+
+    document.addEventListener('click', e => { if (!e.target.closest('#task-menu')) hideTaskMenu(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTaskMenu(); });
+
+    document.getElementById('menu-edit').addEventListener('click', () => {
+      if (!menuTarget) return;
+      const { li, task } = menuTarget;
+      hideTaskMenu();
+      startEdit(li, task);
+    });
+
+    document.getElementById('menu-delete').addEventListener('click', async () => {
+      if (!menuTarget) return;
+      const { li, task } = menuTarget;
+      hideTaskMenu();
+      fadeOut(li, async () => {
+        await sb.from('tasks').delete().eq('id', task.id);
+        li.remove();
+      });
+    });
+
+    document.getElementById('menu-push').addEventListener('click', () => {
+      if (!menuTarget) return;
+      const { li, task, context } = menuTarget;
+      hideTaskMenu();
+      if (context === 'today') pushToTomorrow(li, task);
+      else pullToToday(li, task);
+    });
+
+    function startEdit(li, task) {
+      const wasCrossed = li.classList.contains('crossed');
+      const span = li.querySelector('span');
+      const svg  = li.querySelector('svg');
+      if (svg) svg.remove();
+
+      const original  = task.task_name;
+      const editInput = document.createElement('input');
+      editInput.type      = 'text';
+      editInput.value     = original;
+      editInput.className = 'task-edit-input';
+      span.replaceWith(editInput);
+      editInput.focus();
+      editInput.select();
+
+      let saved = false;
+
+      function finish(newSpan) {
+        if (editInput.parentNode) editInput.replaceWith(newSpan);
+        if (wasCrossed) {
+          li.classList.add('crossed');
+          requestAnimationFrame(() => drawStrike(li, newSpan, false));
+        }
+      }
+
+      async function saveEdit() {
+        if (saved) return;
+        saved = true;
+        const newText = editInput.value.trim() || original;
+        if (newText !== original) {
+          await sb.from('tasks').update({ task_name: newText }).eq('id', task.id);
+          task.task_name = newText;
+        }
+        const newSpan = document.createElement('span');
+        newSpan.textContent = newText;
+        finish(newSpan);
+      }
+
+      function cancelEdit() {
+        if (saved) return;
+        saved = true;
+        const newSpan = document.createElement('span');
+        newSpan.textContent = original;
+        finish(newSpan);
+      }
+
+      editInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  { e.preventDefault(); saveEdit(); }
+        if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+      });
+      editInput.addEventListener('blur', saveEdit);
+    }
 
     init();
   </script>
