@@ -405,6 +405,37 @@
 
     // ── Task UI ───────────────────────────────────────────────────────────────
 
+    function drawStrike(li, span, animate) {
+      const liRect = li.getBoundingClientRect();
+      const rects  = [...span.getClientRects()];
+      const svg    = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;';
+      rects.forEach((rect, i) => {
+        const x1    = rect.left - liRect.left;
+        const x2    = rect.right - liRect.left;
+        const y     = rect.top - liRect.top + rect.height / 2;
+        const tiltY = Math.random() * 6 - 3;
+        const len   = x2 - x1;
+        const line  = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y + tiltY);
+        line.setAttribute('stroke', '#1e451d'); line.setAttribute('stroke-width', '1.5');
+        line.setAttribute('stroke-linecap', 'round');
+        if (animate) {
+          line.style.strokeDasharray  = len;
+          line.style.strokeDashoffset = len;
+          line.style.transition = `stroke-dashoffset 0.35s ease ${i * 0.08}s`;
+        }
+        svg.appendChild(line);
+      });
+      li.appendChild(svg);
+      if (animate) {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          svg.querySelectorAll('line').forEach(l => { l.style.strokeDashoffset = '0'; });
+        }));
+      }
+    }
+
     function crossOff(li, task) {
       const span = li.querySelector('span');
       const nowCrossed = !li.classList.contains('crossed');
@@ -418,21 +449,7 @@
       }
 
       li.classList.add('crossed');
-      const width = span.offsetWidth;
-      const tiltY = (Math.random() * 6 - 3);
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.style.cssText = `position:absolute;top:50%;left:0;width:${width}px;height:14px;transform:translateY(-50%);pointer-events:none;overflow:visible;`;
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', '0'); line.setAttribute('y1', '7');
-      line.setAttribute('x2', width); line.setAttribute('y2', 7 + tiltY);
-      line.setAttribute('stroke', '#1e451d'); line.setAttribute('stroke-width', '1.5');
-      line.setAttribute('stroke-linecap', 'round');
-      line.style.strokeDasharray = width;
-      line.style.strokeDashoffset = width;
-      line.style.transition = 'stroke-dashoffset 0.35s ease';
-      svg.appendChild(line);
-      li.appendChild(svg);
-      requestAnimationFrame(() => requestAnimationFrame(() => { line.style.strokeDashoffset = '0'; }));
+      drawStrike(li, span, true);
     }
 
     function fadeOut(li, cb) {
@@ -465,19 +482,7 @@
       li.appendChild(span);
 
       if (task.crossed_off) {
-        requestAnimationFrame(() => {
-          const width = span.offsetWidth;
-          const tiltY = (Math.random() * 6 - 3);
-          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          svg.style.cssText = `position:absolute;top:50%;left:0;width:${width}px;height:14px;transform:translateY(-50%);pointer-events:none;overflow:visible;`;
-          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', '0'); line.setAttribute('y1', '7');
-          line.setAttribute('x2', width); line.setAttribute('y2', 7 + tiltY);
-          line.setAttribute('stroke', '#1e451d'); line.setAttribute('stroke-width', '1.5');
-          line.setAttribute('stroke-linecap', 'round');
-          svg.appendChild(line);
-          li.appendChild(svg);
-        });
+        requestAnimationFrame(() => drawStrike(li, span, false));
       }
 
       let touchStartX = 0, touchStartY = 0;
