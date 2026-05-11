@@ -12,6 +12,40 @@
   <div class="paper-overlay"></div>
   <div class="fold"></div>
 
+  <!-- Fixed top-left: your chosen icon, opens profile -->
+  <button id="account-btn" class="account-btn" title="your profile"></button>
+
+  <!-- Profile overlay — full page -->
+  <div id="profile-overlay" class="profile-overlay hidden">
+    <div class="paper">
+
+      <section class="profile-section">
+        <p class="section-label">your icon</p>
+        <div class="icon-grid" id="icon-grid"></div>
+      </section>
+
+      <section class="profile-section">
+        <div id="auth-form-area">
+          <p class="section-label">save your list</p>
+          <p class="auth-sub">enter your email. your current tasks will be saved and synced across devices.</p>
+          <input type="email" id="auth-email-input" placeholder="your@email.com" autocomplete="email" />
+          <button id="auth-send-btn">send magic link</button>
+          <p id="auth-status"></p>
+        </div>
+        <div id="auth-user-area" class="hidden">
+          <p class="section-label">account</p>
+          <p id="auth-user-label"></p>
+          <button id="auth-export-btn">export today</button>
+          <button id="auth-signout-btn">sign out</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Same icon, shown at top-left when profile is open — click to close -->
+  <button id="profile-close" class="profile-close hidden"></button>
+
   <main class="paper">
     <header>
       <h1>T O D A Y</h1>
@@ -19,7 +53,6 @@
     </header>
 
     <ul id="task-list"></ul>
-
     <input type="text" id="task-input" autocomplete="off" spellcheck="false" />
   </main>
 
@@ -30,40 +63,261 @@
     const SUPABASE_KEY = 'sb_publishable_LishKGyfBaBZHyzs4uJ23Q_8rxWCq3a';
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // Local date — toISOString() is UTC and shows wrong day in UTC+ timezones
     const d = new Date();
-    const todayStr = d.toISOString().slice(0, 10);
-    const tomorrowD = new Date(d);
-    tomorrowD.setDate(tomorrowD.getDate() + 1);
-    const tomorrowStr = tomorrowD.toISOString().slice(0, 10);
-    const yesterdayD = new Date(d);
-    yesterdayD.setDate(yesterdayD.getDate() - 1);
-    const yesterdayStr = yesterdayD.toISOString().slice(0, 10);
+    const pad = n => String(n).padStart(2, '0');
+    const todayStr     = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const tomorrowD    = new Date(d); tomorrowD.setDate(d.getDate() + 1);
+    const tomorrowStr  = `${tomorrowD.getFullYear()}-${pad(tomorrowD.getMonth()+1)}-${pad(tomorrowD.getDate())}`;
+    const yesterdayD   = new Date(d); yesterdayD.setDate(d.getDate() - 1);
+    const yesterdayStr = `${yesterdayD.getFullYear()}-${pad(yesterdayD.getMonth()+1)}-${pad(yesterdayD.getDate())}`;
 
-    function fmtDisplay(isoStr) {
-      return isoStr.replace(/-/g, ' ');
-    }
-
+    function fmtDisplay(s) { return s.replace(/-/g, ' '); }
     document.getElementById('date').textContent = fmtDisplay(todayStr);
 
-    const input = document.getElementById('task-input');
-    const list = document.getElementById('task-list');
-    const fold = document.querySelector('.fold');
-    const header = document.querySelector('header h1');
-    const dateEl = document.getElementById('date');
+    // ── Icons — 10 circular line drawings, all 20×20 viewBox ─────────────────
 
-    let view = 'today';
-    let userId = null;
+    const ICON_INNER = [
+      // 0: plain circle
+      '',
+      // 1: concentric circles
+      '<circle cx="10" cy="10" r="4.5" stroke="currentColor" stroke-width="1.2" fill="none"/>',
+      // 2: square within circle
+      '<rect x="5.5" y="5.5" width="9" height="9" stroke="currentColor" stroke-width="1.2" fill="none"/>',
+      // 3: triangle within circle (equilateral, inscribed)
+      '<polygon points="10,1.5 17.36,14.25 2.64,14.25" stroke="currentColor" stroke-width="1.2" fill="none"/>',
+      // 4: diamond within circle (square rotated 45°, inscribed)
+      '<polygon points="10,1.5 18.5,10 10,18.5 1.5,10" stroke="currentColor" stroke-width="1.2" fill="none"/>',
+      // 5: cross — edge to edge horizontal + vertical
+      '<line x1="10" y1="1.5" x2="10" y2="18.5" stroke="currentColor" stroke-width="1.2"/><line x1="1.5" y1="10" x2="18.5" y2="10" stroke="currentColor" stroke-width="1.2"/>',
+      // 6: peace sign — vertical line + two arms from centre
+      '<line x1="10" y1="1.5" x2="10" y2="18.5" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="10" x2="5.75" y2="17.36" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="10" x2="14.25" y2="17.36" stroke="currentColor" stroke-width="1.2"/>',
+      // 7: 3-way spokes from centre (120° apart)
+      '<line x1="10" y1="10" x2="10" y2="1.5" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="10" x2="17.36" y2="14.25" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="10" x2="2.64" y2="14.25" stroke="currentColor" stroke-width="1.2"/>',
+      // 8: pie chart — one 120° sector outline
+      '<path d="M10 10 L10 1.5 A8.5 8.5 0 0 1 17.36 14.25 Z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/>',
+      // 9: asterisk — 3 full diameters at 60° apart
+      '<line x1="10" y1="1.5" x2="10" y2="18.5" stroke="currentColor" stroke-width="1.2"/><line x1="17.36" y1="5.75" x2="2.64" y2="14.25" stroke="currentColor" stroke-width="1.2"/><line x1="2.64" y1="5.75" x2="17.36" y2="14.25" stroke="currentColor" stroke-width="1.2"/>',
+    ];
+
+    function renderIconSVG(index, size = 20) {
+      const outer = '<circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.2" fill="none"/>';
+      return `<svg width="${size}" height="${size}" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">${outer}${ICON_INNER[index]}</svg>`;
+    }
+
+    // ── DOM refs ──────────────────────────────────────────────────────────────
+
+    const input          = document.getElementById('task-input');
+    const list           = document.getElementById('task-list');
+    const fold           = document.querySelector('.fold');
+    const headerTitle    = document.querySelector('header h1');
+    const dateEl         = document.getElementById('date');
+    const accountBtn     = document.getElementById('account-btn');
+    const profileOverlay = document.getElementById('profile-overlay');
+    const profileClose   = document.getElementById('profile-close');
+    const iconGrid       = document.getElementById('icon-grid');
+    const authFormArea   = document.getElementById('auth-form-area');
+    const authUserArea   = document.getElementById('auth-user-area');
+    const authStatus     = document.getElementById('auth-status');
+    const authEmailInput = document.getElementById('auth-email-input');
+    const authUserLabel  = document.getElementById('auth-user-label');
+
+    // ── State ─────────────────────────────────────────────────────────────────
+
+    let view             = 'today';
+    let userId           = null;
+    let currentUserEmail = null;
+    let currentIconIndex = 0;
     let sortableInstance = null;
+    let authInitialized  = false;
+
+    // ── Icon UI ───────────────────────────────────────────────────────────────
+
+    function updateIconButtons() {
+      const svg = renderIconSVG(currentIconIndex);
+      accountBtn.innerHTML   = svg;
+      profileClose.innerHTML = svg;
+    }
+
+    function loadIconPref(session) {
+      const meta = session?.user?.user_metadata?.icon;
+      if (meta != null) return parseInt(meta);
+      const stored = localStorage.getItem('today-list-icon');
+      return stored != null ? parseInt(stored) : 0;
+    }
+
+    async function selectIcon(index) {
+      currentIconIndex = index;
+      updateIconButtons();
+      buildIconGrid();
+      localStorage.setItem('today-list-icon', index);
+      if (userId && currentUserEmail) {
+        await sb.auth.updateUser({ data: { icon: index } });
+      }
+    }
+
+    function buildIconGrid() {
+      iconGrid.innerHTML = '';
+      ICON_INNER.forEach((_, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'icon-option' + (i === currentIconIndex ? ' selected' : '');
+        btn.innerHTML = renderIconSVG(i, 26);
+        btn.addEventListener('click', () => selectIcon(i));
+        iconGrid.appendChild(btn);
+      });
+    }
+
+    // ── Profile overlay ───────────────────────────────────────────────────────
+
+    function showProfileOverlay() {
+      profileOverlay.classList.remove('hidden');
+      profileClose.classList.remove('hidden');
+      buildIconGrid();
+    }
+
+    function hideProfileOverlay() {
+      profileOverlay.classList.add('hidden');
+      profileClose.classList.add('hidden');
+    }
+
+    function updateAccountUI(email) {
+      currentUserEmail = email;
+      if (email) {
+        authFormArea.classList.add('hidden');
+        authUserArea.classList.remove('hidden');
+        authUserLabel.textContent = email;
+      } else {
+        authFormArea.classList.remove('hidden');
+        authUserArea.classList.add('hidden');
+        authStatus.textContent = '';
+      }
+    }
+
+    accountBtn.addEventListener('click', showProfileOverlay);
+    profileClose.addEventListener('click', hideProfileOverlay);
+
+    // ── Auth actions ──────────────────────────────────────────────────────────
+
+    document.getElementById('auth-send-btn').addEventListener('click', async () => {
+      const email = authEmailInput.value.trim();
+      if (!email) return;
+      authStatus.textContent = 'sending...';
+
+      // Save current tasks to localStorage so they transfer after sign-in redirect
+      if (userId) {
+        try {
+          const { data: tasks } = await sb.from('tasks')
+            .select('task_name, day, crossed_off, rolled_over, position')
+            .eq('user_id', userId);
+          if (tasks?.length) {
+            localStorage.setItem('today-list-transfer', JSON.stringify({ tasks, ts: Date.now() }));
+          }
+        } catch (e) {}
+      }
+
+      const { error } = await sb.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: location.origin + location.pathname }
+      });
+      if (error) {
+        authStatus.textContent = 'error — try again';
+      } else {
+        authStatus.textContent = 'check your inbox';
+        authEmailInput.value = '';
+      }
+    });
+
+    authEmailInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('auth-send-btn').click();
+    });
+
+    document.getElementById('auth-export-btn').addEventListener('click', () => {
+      const items = [...list.querySelectorAll('.task-item')];
+      const lines = [`T O D A Y — ${fmtDisplay(todayStr)}`, ''];
+      items.forEach(li => {
+        lines.push(`${li.classList.contains('crossed') ? '×' : '·'} ${li.querySelector('span').textContent}`);
+      });
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), { href: url, download: `today-${todayStr}.txt` });
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('auth-signout-btn').addEventListener('click', async () => {
+      authInitialized = false;
+      await sb.auth.signOut();
+      hideProfileOverlay();
+      updateAccountUI(null);
+      list.innerHTML = '';
+      userId = null;
+      await init();
+    });
+
+    // Handle magic-link callbacks — fires after authInitialized = true
+    sb.auth.onAuthStateChange(async (event, session) => {
+      if (!authInitialized) return;
+      if (event === 'SIGNED_IN' && session?.user?.email) {
+        await maybeTransferTasks(session.user.id);
+        userId = session.user.id;
+        currentIconIndex = loadIconPref(session);
+        updateIconButtons();
+        updateAccountUI(session.user.email);
+        await renderToday();
+        hideProfileOverlay();
+      } else if (event === 'SIGNED_OUT') {
+        userId = null;
+        updateAccountUI(null);
+      }
+    });
+
+    // ── Task transfer: anonymous → email account ───────────────────────────────
+
+    async function maybeTransferTasks(newUserId) {
+      const stored = localStorage.getItem('today-list-transfer');
+      if (!stored) return;
+      try {
+        const { tasks, ts } = JSON.parse(stored);
+        if (Date.now() - ts < 86400000 && tasks?.length) {
+          const { data: existing } = await sb.from('tasks')
+            .select('id').eq('user_id', newUserId).limit(1);
+          if (!existing?.length) {
+            const toInsert = tasks.map(({ id, user_id, created_at, ...rest }) =>
+              ({ ...rest, user_id: newUserId })
+            );
+            await sb.from('tasks').insert(toInsert);
+          }
+        }
+      } catch (e) {}
+      localStorage.removeItem('today-list-transfer');
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
 
     async function init() {
-      let { data: { session } } = await sb.auth.getSession();
-      if (!session) {
-        const { data } = await sb.auth.signInAnonymously();
-        session = data.session;
-      }
-      userId = session.user.id;
+      const { data: { session } } = await sb.auth.getSession();
 
-      // Roll over yesterday's uncompleted tasks
+      if (session) {
+        userId = session.user.id;
+        currentIconIndex = loadIconPref(session);
+        updateIconButtons();
+        updateAccountUI(session.user.email || null);
+        if (session.user.email) await maybeTransferTasks(userId);
+      } else {
+        const { data, error } = await sb.auth.signInAnonymously();
+        if (error || !data?.session) {
+          currentIconIndex = loadIconPref(null);
+          updateIconButtons();
+          authInitialized = true;
+          showProfileOverlay();
+          return;
+        }
+        userId = data.session.user.id;
+        currentIconIndex = loadIconPref(null);
+        updateIconButtons();
+        updateAccountUI(null);
+      }
+
       await sb.from('tasks')
         .update({ day: todayStr, rolled_over: true })
         .eq('user_id', userId)
@@ -71,11 +325,14 @@
         .eq('crossed_off', false);
 
       await renderToday();
+      authInitialized = true;
     }
+
+    // ── Render ────────────────────────────────────────────────────────────────
 
     async function renderToday() {
       view = 'today';
-      header.textContent = 'T O D A Y';
+      headerTitle.textContent = 'T O D A Y';
       dateEl.textContent = fmtDisplay(todayStr);
       input.style.display = '';
       list.innerHTML = '';
@@ -100,7 +357,7 @@
 
     async function renderTomorrow() {
       view = 'tomorrow';
-      header.textContent = 'T O M O R R O W';
+      headerTitle.textContent = 'T O M O R R O W';
       dateEl.textContent = fmtDisplay(tomorrowStr);
       input.style.display = 'none';
       list.innerHTML = '';
@@ -146,10 +403,11 @@
       ));
     }
 
+    // ── Task UI ───────────────────────────────────────────────────────────────
+
     function crossOff(li, task) {
       const span = li.querySelector('span');
       const nowCrossed = !li.classList.contains('crossed');
-
       sb.from('tasks').update({ crossed_off: nowCrossed }).eq('id', task.id);
 
       if (!nowCrossed) {
@@ -160,31 +418,21 @@
       }
 
       li.classList.add('crossed');
-
       const width = span.offsetWidth;
       const tiltY = (Math.random() * 6 - 3);
-
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.style.cssText = `position:absolute;top:50%;left:0;width:${width}px;height:14px;transform:translateY(-50%);pointer-events:none;overflow:visible;`;
-
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', '0');
-      line.setAttribute('y1', '7');
-      line.setAttribute('x2', width);
-      line.setAttribute('y2', 7 + tiltY);
-      line.setAttribute('stroke', '#1e451d');
-      line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('x1', '0'); line.setAttribute('y1', '7');
+      line.setAttribute('x2', width); line.setAttribute('y2', 7 + tiltY);
+      line.setAttribute('stroke', '#1e451d'); line.setAttribute('stroke-width', '1.5');
       line.setAttribute('stroke-linecap', 'round');
       line.style.strokeDasharray = width;
       line.style.strokeDashoffset = width;
       line.style.transition = 'stroke-dashoffset 0.35s ease';
-
       svg.appendChild(line);
       li.appendChild(svg);
-
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        line.style.strokeDashoffset = '0';
-      }));
+      requestAnimationFrame(() => requestAnimationFrame(() => { line.style.strokeDashoffset = '0'; }));
     }
 
     function fadeOut(li, cb) {
@@ -217,33 +465,26 @@
       li.appendChild(span);
 
       if (task.crossed_off) {
-        // Restore strikethrough line without animation
         requestAnimationFrame(() => {
           const width = span.offsetWidth;
           const tiltY = (Math.random() * 6 - 3);
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           svg.style.cssText = `position:absolute;top:50%;left:0;width:${width}px;height:14px;transform:translateY(-50%);pointer-events:none;overflow:visible;`;
           const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', '0');
-          line.setAttribute('y1', '7');
-          line.setAttribute('x2', width);
-          line.setAttribute('y2', 7 + tiltY);
-          line.setAttribute('stroke', '#1e451d');
-          line.setAttribute('stroke-width', '1.5');
+          line.setAttribute('x1', '0'); line.setAttribute('y1', '7');
+          line.setAttribute('x2', width); line.setAttribute('y2', 7 + tiltY);
+          line.setAttribute('stroke', '#1e451d'); line.setAttribute('stroke-width', '1.5');
           line.setAttribute('stroke-linecap', 'round');
           svg.appendChild(line);
           li.appendChild(svg);
         });
       }
 
-      let touchStartX = 0;
-      let touchStartY = 0;
-
+      let touchStartX = 0, touchStartY = 0;
       li.addEventListener('touchstart', e => {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
       }, { passive: true });
-
       li.addEventListener('touchend', e => {
         const dx = e.changedTouches[0].clientX - touchStartX;
         const dy = e.changedTouches[0].clientY - touchStartY;
@@ -258,10 +499,7 @@
 
       if (context === 'today') {
         li.addEventListener('click', () => crossOff(li, task));
-        li.addEventListener('contextmenu', e => {
-          e.preventDefault();
-          pushToTomorrow(li, task);
-        });
+        li.addEventListener('contextmenu', e => { e.preventDefault(); pushToTomorrow(li, task); });
       } else {
         li.addEventListener('click', () => pullToToday(li, task));
       }
@@ -269,18 +507,31 @@
       return li;
     }
 
+    // ── Add task ──────────────────────────────────────────────────────────────
+
     input.addEventListener('keydown', async function(e) {
       if (e.key !== 'Enter') return;
       const text = input.value.trim();
       if (!text) return;
+      if (!userId) { showProfileOverlay(); return; }
+
       input.value = '';
 
       const { data: inserted, error } = await sb.from('tasks')
-        .insert({ user_id: userId, task_name: text, crossed_off: false, day: todayStr, rolled_over: false, position: list.querySelectorAll('.task-item').length })
-        .select()
-        .single();
+        .insert({
+          user_id: userId, task_name: text, crossed_off: false,
+          day: todayStr, rolled_over: false,
+          position: list.querySelectorAll('.task-item').length
+        })
+        .select().single();
 
-      if (error) { console.error('insert error:', error); return; }
+      if (error) {
+        console.error('insert error:', error);
+        input.value = text;
+        input.style.opacity = '0.4';
+        setTimeout(() => { input.style.opacity = ''; }, 900);
+        return;
+      }
       if (inserted) list.appendChild(makeTask(inserted, 'today'));
     });
 
