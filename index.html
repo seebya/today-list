@@ -54,7 +54,56 @@
 
     <ul id="task-list"></ul>
     <input type="text" id="task-input" autocomplete="off" spellcheck="false" />
+    <button id="dump-btn" class="dump-btn">brain dump</button>
   </main>
+
+  <!-- Brain dump close button — fixed top-left, shown when overlay is open -->
+  <button id="dump-close-btn" class="dump-close-btn hidden"></button>
+
+  <!-- Brain dump overlay -->
+  <div id="dump-overlay" class="dump-overlay hidden">
+    <div class="paper">
+      <header>
+        <h1>D U M P</h1>
+        <p id="dump-date-label"></p>
+      </header>
+
+      <!-- Step 1: write -->
+      <div id="dump-step-write">
+        <textarea id="dump-textarea" spellcheck="false"
+          placeholder="everything in your head. no filter.&#10;&#10;one item per line, or just stream — doesn't matter."></textarea>
+        <button id="dump-sort-btn">sort it</button>
+        <p id="dump-status" class="dump-status"></p>
+      </div>
+
+      <!-- Step 2: sorted results -->
+      <div id="dump-step-sorted" class="hidden">
+        <section class="dump-quadrant">
+          <p class="section-label">easy · today <span class="q-hint">— start here</span></p>
+          <ul id="ql-easy-today" class="dump-list"></ul>
+        </section>
+        <section class="dump-quadrant">
+          <p class="section-label">hard · today <span class="q-hint">— use that momentum</span></p>
+          <ul id="ql-hard-today" class="dump-list"></ul>
+        </section>
+        <section class="dump-quadrant">
+          <p class="section-label">easy · later <span class="q-hint">— resist the urge</span></p>
+          <ul id="ql-easy-later" class="dump-list"></ul>
+        </section>
+        <section class="dump-quadrant">
+          <p class="section-label">hard · later <span class="q-hint">— tap to break down</span></p>
+          <ul id="ql-hard-later" class="dump-list"></ul>
+        </section>
+
+        <div class="dump-sorted-actions">
+          <button id="dump-add-today-btn">add today tasks to list</button>
+          <button id="dump-add-later-btn">send later tasks to tomorrow</button>
+          <button id="dump-redo-btn">sort again</button>
+        </div>
+        <p id="dump-add-status" class="dump-status"></p>
+      </div>
+    </div>
+  </div>
 
   <div id="task-menu" class="task-menu hidden">
     <button id="menu-edit">edit</button>
@@ -127,6 +176,7 @@
     const authStatus     = document.getElementById('auth-status');
     const authEmailInput = document.getElementById('auth-email-input');
     const authUserLabel  = document.getElementById('auth-user-label');
+    const dumpCloseBtn   = document.getElementById('dump-close-btn');
 
     // ── State ─────────────────────────────────────────────────────────────────
 
@@ -143,6 +193,7 @@
       const svg = renderIconSVG(currentIconIndex);
       accountBtn.innerHTML   = svg;
       profileClose.innerHTML = svg;
+      dumpCloseBtn.innerHTML = svg;
     }
 
     function loadIconPref(session) {
@@ -654,6 +705,274 @@
     }
 
     init();
+
+    // ── Brain dump ────────────────────────────────────────────────────
+
+    const dumpOverlay    = document.getElementById('dump-overlay');
+    const dumpBtn        = document.getElementById('dump-btn');
+    const dumpTextarea   = document.getElementById('dump-textarea');
+    const dumpSortBtn    = document.getElementById('dump-sort-btn');
+    const dumpStatus     = document.getElementById('dump-status');
+    const dumpStepWrite  = document.getElementById('dump-step-write');
+    const dumpStepSorted = document.getElementById('dump-step-sorted');
+    const dumpAddStatus  = document.getElementById('dump-add-status');
+
+    let _generator = null;
+    let sortedData = { easyToday: [], hardToday: [], easyLater: [], hardLater: [] };
+
+    function openDump() {
+      dumpOverlay.classList.remove('hidden');
+      dumpCloseBtn.classList.remove('hidden');
+      accountBtn.style.visibility = 'hidden';
+      document.getElementById('dump-date-label').textContent = fmtDisplay(todayStr);
+    }
+
+    function closeDump() {
+      dumpOverlay.classList.add('hidden');
+      dumpCloseBtn.classList.add('hidden');
+      accountBtn.style.visibility = '';
+    }
+
+    dumpBtn.addEventListener('click', openDump);
+    dumpCloseBtn.addEventListener('click', closeDump);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !dumpOverlay.classList.contains('hidden')) closeDump();
+    });
+
+    async function ensureGenerator() {
+      if (_generator) return _generator;
+
+      const { pipeline, env } = await import(
+        'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3'
+      );
+
+      env.allowLocalModels = false;
+
+      _generator = await pipeline(
+        'text-generation',
+        'onnx-community/Qwen2.5-0.5B-Instruct',
+        {
+          dtype: 'q4',
+          progress_callback: ({ status, progress }) => {
+            if (status === 'progress' && typeof progress === 'number') {
+              dumpStatus.textContent = `downloading model... ${Math.round(progress)}%`;
+            } else if (status === 'ready') {
+              dumpStatus.textContent = '';
+            }
+          }
+        }
+      );
+
+      return _generator;
+    }
+
+    async function callLLM(messages, maxTokens) {
+      const gen = await ensureGenerator();
+      const out = await gen(messages, { max_new_tokens: maxTokens, do_sample: false });
+      const msgs = out[0].generated_text;
+      return msgs[msgs.length - 1].content;
+    }
+
+    function parseJSON(text, fallback) {
+      const obj = text.match(/\{[\s\S]*\}/);
+      if (obj) { try { return JSON.parse(obj[0]); } catch {} }
+      const arr = text.match(/\[[\s\S]*\]/);
+      if (arr) { try { return JSON.parse(arr[0]); } catch {} }
+      return fallback;
+    }
+
+    async function runSort(rawText) {
+      dumpSortBtn.disabled = true;
+      dumpStatus.textContent = 'loading model (first time ~400mb, cached after)...';
+
+      try {
+        const messages = [
+          {
+            role: 'system',
+            content: 'You are a task organizer. Respond with valid JSON only, no other text.'
+          },
+          {
+            role: 'user',
+            content: `Sort these items into four categories based on urgency and effort.
+
+easy = done in under 30 min without deep focus
+hard = needs real concentration or multiple steps
+today = feels urgent or time-sensitive
+later = can wait
+
+Items:
+${rawText}
+
+Return ONLY this JSON (keep item text short):
+{"easyToday":[],"hardToday":[],"easyLater":[],"hardLater":[]}`
+          }
+        ];
+
+        dumpStatus.textContent = 'thinking...';
+        const response = await callLLM(messages, 512);
+        const parsed = parseJSON(response, { easyToday: [], hardToday: [], easyLater: [], hardLater: [] });
+
+        sortedData = {
+          easyToday: (parsed.easyToday || []).map(t => ({ text: String(t), steps: null, expanding: false })),
+          hardToday: (parsed.hardToday || []).map(t => ({ text: String(t), steps: null, expanding: false })),
+          easyLater: (parsed.easyLater || []).map(t => ({ text: String(t), steps: null, expanding: false })),
+          hardLater: (parsed.hardLater || []).map(t => ({ text: String(t), steps: null, expanding: false })),
+        };
+
+        dumpStatus.textContent = '';
+        renderSorted();
+        dumpStepWrite.classList.add('hidden');
+        dumpStepSorted.classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+        dumpStatus.textContent = 'something went wrong — try again';
+      } finally {
+        dumpSortBtn.disabled = false;
+      }
+    }
+
+    async function runBreakDown(task) {
+      if (task.expanding || task.steps) return;
+      task.expanding = true;
+      renderSorted();
+
+      try {
+        const messages = [
+          {
+            role: 'system',
+            content: 'You are a task organizer. Respond with valid JSON only, no other text.'
+          },
+          {
+            role: 'user',
+            content: `Break this task into 3–5 small, concrete steps (each under 10 minutes, very actionable).
+
+Task: ${task.text}
+
+Return ONLY a JSON array:
+["step 1", "step 2", "step 3"]`
+          }
+        ];
+
+        const response = await callLLM(messages, 200);
+        const steps = parseJSON(response, []);
+        task.steps = Array.isArray(steps) ? steps.map(String) : [];
+      } catch (err) {
+        console.error(err);
+        task.steps = null;
+      } finally {
+        task.expanding = false;
+        renderSorted();
+      }
+    }
+
+    function renderSortedQuadrant(listEl, tasks, isHard) {
+      listEl.innerHTML = '';
+      tasks.forEach((task, i) => {
+        const li = document.createElement('li');
+        li.className = 'dump-list-item' + (i >= 3 ? ' is-overflow' : '');
+
+        const textSpan = document.createElement('span');
+        textSpan.className = 'dump-item-text';
+        textSpan.textContent = task.text;
+        li.appendChild(textSpan);
+
+        if (task.expanding) {
+          const hint = document.createElement('span');
+          hint.className = 'dump-break-hint';
+          hint.textContent = '...';
+          li.appendChild(hint);
+        } else if (isHard && !task.steps) {
+          const hint = document.createElement('span');
+          hint.className = 'dump-break-hint';
+          hint.textContent = '↓ break down';
+          li.appendChild(hint);
+          li.style.cursor = 'pointer';
+          li.addEventListener('click', () => runBreakDown(task));
+        }
+
+        if (task.steps && task.steps.length) {
+          const stepsUl = document.createElement('ul');
+          stepsUl.className = 'dump-steps';
+          task.steps.forEach(step => {
+            const stepLi = document.createElement('li');
+            stepLi.className = 'dump-step-item';
+            stepLi.textContent = step;
+            stepsUl.appendChild(stepLi);
+          });
+          li.appendChild(stepsUl);
+        }
+
+        listEl.appendChild(li);
+      });
+
+      if (tasks.length > 3) {
+        const note = document.createElement('p');
+        note.className = 'dump-overflow-note';
+        note.textContent = `${tasks.length - 3} more — consider moving to later`;
+        listEl.appendChild(note);
+      }
+    }
+
+    function renderSorted() {
+      renderSortedQuadrant(document.getElementById('ql-easy-today'), sortedData.easyToday, false);
+      renderSortedQuadrant(document.getElementById('ql-hard-today'), sortedData.hardToday, true);
+      renderSortedQuadrant(document.getElementById('ql-easy-later'), sortedData.easyLater, false);
+      renderSortedQuadrant(document.getElementById('ql-hard-later'), sortedData.hardLater, true);
+    }
+
+    dumpSortBtn.addEventListener('click', () => {
+      const text = dumpTextarea.value.trim();
+      if (text) runSort(text);
+    });
+
+    dumpTextarea.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        const text = dumpTextarea.value.trim();
+        if (text) runSort(text);
+      }
+    });
+
+    document.getElementById('dump-redo-btn').addEventListener('click', () => {
+      dumpStepSorted.classList.add('hidden');
+      dumpStepWrite.classList.remove('hidden');
+      dumpStatus.textContent = '';
+    });
+
+    async function addDumpTasksToSupabase(taskTexts, day) {
+      if (!userId || !taskTexts.length) return;
+      const startPos = list.querySelectorAll('.task-item').length;
+      await Promise.all(taskTexts.map((text, i) =>
+        sb.from('tasks').insert({
+          user_id: userId, task_name: text, crossed_off: false,
+          day, rolled_over: false, position: startPos + i
+        })
+      ));
+    }
+
+    document.getElementById('dump-add-today-btn').addEventListener('click', async () => {
+      const tasks = [];
+      [...sortedData.easyToday, ...sortedData.hardToday].forEach(t => {
+        if (t.steps?.length) t.steps.forEach(s => tasks.push(s));
+        else tasks.push(t.text);
+      });
+      if (!tasks.length) return;
+      await addDumpTasksToSupabase(tasks, todayStr);
+      dumpAddStatus.textContent = `added ${tasks.length} task${tasks.length !== 1 ? 's' : ''} to today`;
+      if (view === 'today') renderToday();
+      setTimeout(() => { dumpAddStatus.textContent = ''; }, 3000);
+    });
+
+    document.getElementById('dump-add-later-btn').addEventListener('click', async () => {
+      const tasks = [];
+      [...sortedData.easyLater, ...sortedData.hardLater].forEach(t => {
+        if (t.steps?.length) t.steps.forEach(s => tasks.push(s));
+        else tasks.push(t.text);
+      });
+      if (!tasks.length) return;
+      await addDumpTasksToSupabase(tasks, tomorrowStr);
+      dumpAddStatus.textContent = `added ${tasks.length} task${tasks.length !== 1 ? 's' : ''} to tomorrow`;
+      setTimeout(() => { dumpAddStatus.textContent = ''; }, 3000);
+    });
   </script>
 </body>
 </html>

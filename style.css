@@ -297,3 +297,174 @@ header p {
   caret-color: #142e13;
   padding: 0.55rem 0;
 }
+
+/* ── Brain dump trigger ── */
+
+.dump-btn {
+  display: block;
+  background: none;
+  border: none;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.7rem;
+  color: #1e451d;
+  opacity: 0.22;
+  cursor: pointer;
+  padding: 0.6rem 0 0;
+  text-align: left;
+  letter-spacing: 0.06em;
+  transition: opacity 0.15s;
+}
+
+.dump-btn:hover { opacity: 0.65; }
+
+/* ── Dump close button (fixed top-left, same as profile-close) ── */
+
+.dump-close-btn {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 201;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #1e451d;
+  opacity: 0.6;
+  line-height: 0;
+  display: block;
+}
+
+.dump-close-btn:hover { opacity: 1; }
+
+/* ── Dump overlay ── */
+
+.dump-overlay {
+  position: fixed;
+  inset: 0;
+  background: #f7f4e9;
+  z-index: 200;
+  overflow-y: auto;
+}
+
+/* ── Textarea ── */
+
+#dump-textarea {
+  display: block;
+  width: 100%;
+  min-height: 260px;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: #1e451d;
+  caret-color: #142e13;
+  resize: none;
+  padding: 0.25rem 0;
+  line-height: 1.7;
+  margin-bottom: 1.5rem;
+}
+
+#dump-textarea::placeholder {
+  opacity: 0.3;
+  white-space: pre-wrap;
+}
+
+/* ── Status ── */
+
+.dump-status {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  color: #1e451d;
+  opacity: 0.5;
+  min-height: 1rem;
+  margin-top: 0.75rem;
+}
+
+/* ── Quadrants ── */
+
+.dump-quadrant {
+  margin-bottom: 2.5rem;
+}
+
+.q-hint {
+  font-size: 0.65rem;
+  opacity: 0.45;
+  letter-spacing: 0;
+  text-transform: none;
+  font-style: italic;
+}
+
+/* ── Task list inside quadrant ── */
+
+.dump-list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+}
+
+.dump-list-item {
+  padding: 0.4rem 0;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.92rem;
+  color: #1e451d;
+  line-height: 1.4;
+}
+
+.dump-list-item.is-overflow {
+  opacity: 0.35;
+}
+
+.dump-item-text {
+  display: inline;
+}
+
+.dump-break-hint {
+  font-size: 0.65rem;
+  opacity: 0.35;
+  margin-left: 0.6rem;
+  font-style: italic;
+}
+
+/* ── Mini steps (Goblin Tools style) ── */
+
+.dump-steps {
+  list-style: none;
+  margin: 0.5rem 0 0.25rem 0.75rem;
+  padding-left: 0.75rem;
+  border-left: 1px solid rgba(30, 69, 29, 0.15);
+}
+
+.dump-step-item {
+  padding: 0.22rem 0;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.8rem;
+  color: #1e451d;
+  opacity: 0.7;
+  line-height: 1.5;
+}
+
+.dump-step-item::before {
+  content: '· ';
+  opacity: 0.5;
+}
+
+/* ── Overflow note ── */
+
+.dump-overflow-note {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  color: #1e451d;
+  opacity: 0.3;
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
+/* ── Sorted actions ── */
+
+.dump-sorted-actions {
+  margin-top: 2.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
