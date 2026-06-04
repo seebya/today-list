@@ -856,11 +856,11 @@
         {
           role: 'system',
           content:
-            'Extract discrete tasks or intentions from a stream-of-consciousness brain dump. ' +
-            'Classify each as one of: easy-today, hard-today, easy-later, hard-later.\n' +
-            'easy = quick/low-effort. hard = needs focus or planning. today = do now. later = can wait.\n' +
-            'Reply ONLY with a JSON array, no other text:\n' +
-            '[{"task":"go to the bathroom","q":"easy-today"},{"task":"write the quarterly report","q":"hard-later"}]'
+            'Extract tasks from a brain dump. Classify each as easy-today, hard-today, easy-later, or hard-later.\n' +
+            'easy=quick/low-effort. hard=needs focus or multiple steps.\n' +
+            'today=default unless the user said "later","eventually","someday","one day","maybe","at some point".\n' +
+            'Reply ONLY with JSON array:\n' +
+            '[{"task":"drink water","q":"easy-today"},{"task":"call dentist eventually","q":"easy-later"}]'
         },
         { role: 'user', content: text }
       ];
@@ -868,10 +868,11 @@
       const result = await gen(messages, { max_new_tokens: 512, temperature: 0.15, do_sample: false });
       const reply  = result[0].generated_text.at(-1).content.trim();
 
-      const jsonMatch = reply.match(/\[[\s\S]*?\]/);
-      if (!jsonMatch) throw new Error('No JSON array in response');
+      const start = reply.indexOf('[');
+      const end   = reply.lastIndexOf(']');
+      if (start === -1 || end <= start) throw new Error('No JSON array in response');
 
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(reply.slice(start, end + 1));
       const valid  = new Set(['easy-today','hard-today','easy-later','hard-later']);
 
       return parsed
