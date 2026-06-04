@@ -824,7 +824,8 @@
       if (bdGenerator) return bdGenerator;
       if (bdModelLoading) return null;
       bdModelLoading = true;
-      braindumpStatus.textContent = 'loading model… (first time ~400mb, then cached)';
+      const bdSeen = localStorage.getItem('bd-model-ready');
+      braindumpStatus.textContent = bdSeen ? 'loading from cache…' : 'loading model… (first time ~400mb, then cached)';
       try {
         const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/transformers.min.js');
         env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/';
@@ -836,10 +837,11 @@
               const pct = info.total ? Math.round((info.loaded / info.total) * 100) : '…';
               braindumpStatus.textContent = `downloading model… ${pct}%`;
             } else if (info.status === 'loading') {
-              braindumpStatus.textContent = 'loading model…';
+              braindumpStatus.textContent = bdSeen ? 'loading from cache…' : 'loading model…';
             }
           }
         });
+        localStorage.setItem('bd-model-ready', '1');
         bdModelLoading = false;
         return bdGenerator;
       } catch (err) {
@@ -873,11 +875,27 @@
       if (start === -1 || end <= start) throw new Error('No JSON array in response');
 
       const parsed = JSON.parse(reply.slice(start, end + 1));
-      const valid  = new Set(['easy-today','hard-today','easy-later','hard-later']);
+
+      function normalizeQ(raw) {
+        if (!raw) return null;
+        const s = String(raw).toLowerCase().replace(/[\s_]/g, '-');
+        if (['easy-today','hard-today','easy-later','hard-later'].includes(s)) return s;
+        const isHard  = s.includes('hard');
+        const isLater = s.includes('later');
+        if (isHard  && isLater)  return 'hard-later';
+        if (isHard)              return 'hard-today';
+        if (isLater)             return 'easy-later';
+        if (s.includes('easy'))  return 'easy-today';
+        return null;
+      }
 
       return parsed
-        .filter(item => item.task && typeof item.task === 'string' && valid.has(item.q))
-        .map(item => ({ task: item.task.trim(), quadrant: item.q }))
+        .map(item => {
+          const task = (item.task || item.text || item.name || '').trim();
+          const q    = normalizeQ(item.q || item.quadrant || item.category);
+          return (task && q) ? { task, quadrant: q } : null;
+        })
+        .filter(Boolean)
         .slice(0, 25);
     }
 
