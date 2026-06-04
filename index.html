@@ -94,21 +94,21 @@
         <button id="braindump-close" class="braindump-close">×</button>
       </div>
 
-      <!-- Phase 1: capture (voice or text) -->
+      <!-- Phase 1: chat -->
       <div id="bd-phase-input">
-        <button id="bd-mic-btn" class="bd-mic-btn" title="tap to speak">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-            <rect x="9" y="2" width="6" height="12" rx="3"/>
-            <path d="M5 10a7 7 0 0 0 14 0"/>
-            <line x1="12" y1="17" x2="12" y2="21"/>
-            <line x1="9" y1="21" x2="15" y2="21"/>
-          </svg>
-        </button>
-        <p id="bd-mic-status" class="bd-mic-status">tap to speak</p>
-        <textarea id="braindump-text" placeholder="or type freely — stream of consciousness, no formatting needed" autocomplete="off" spellcheck="false"></textarea>
-        <div class="braindump-actions-row">
-          <button id="braindump-sort-btn">sort it</button>
-          <p id="braindump-status"></p>
+        <div id="bd-chat-messages" class="bd-chat-messages"></div>
+        <p id="braindump-status" class="bd-chat-status"></p>
+        <div class="bd-chat-input-row">
+          <button id="bd-mic-btn" class="bd-mic-btn" title="tap to speak">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <rect x="9" y="2" width="6" height="12" rx="3"/>
+              <path d="M5 10a7 7 0 0 0 14 0"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+              <line x1="9" y1="21" x2="15" y2="21"/>
+            </svg>
+          </button>
+          <input id="bd-chat-input" class="bd-chat-input" type="text" placeholder="type or speak…" autocomplete="off" spellcheck="false" />
+          <button id="bd-send-btn" class="bd-send-btn">→</button>
         </div>
       </div>
 
@@ -709,31 +709,25 @@
       editInput.addEventListener('blur', saveEdit);
     }
 
-    // ── Brain Dump ────────────────────────────────────────────────────────────
+    // ── Brain Dump (chat) ─────────────────────────────────────────────────────
 
-    const BD_MODEL = 'onnx-community/Qwen2.5-0.5B-Instruct';
-    let bdGenerator    = null;
-    let bdModelLoading = false;
-    let bdExtracted    = []; // [{task, quadrant}]
+    let bdExtracted  = [];
+    let chatHistory  = [];
+    let chatWaiting  = false;
 
     const braindumpOverlay = document.getElementById('braindump-overlay');
     const braindumpClose   = document.getElementById('braindump-close');
-    const braindumpText    = document.getElementById('braindump-text');
-    const braindumpSortBtn = document.getElementById('braindump-sort-btn');
-    const braindumpStatus  = document.getElementById('braindump-status');
     const bdPhaseInput     = document.getElementById('bd-phase-input');
     const bdPhaseResults   = document.getElementById('bd-phase-results');
+    const bdChatMessages   = document.getElementById('bd-chat-messages');
+    const bdChatInput      = document.getElementById('bd-chat-input');
+    const bdStatus         = document.getElementById('braindump-status');
     const bdMicBtn         = document.getElementById('bd-mic-btn');
-    const bdMicStatus      = document.getElementById('bd-mic-status');
 
-    // ── Voice recording ───────────────────────────────────────────────────────
+    // ── Voice ─────────────────────────────────────────────────────────────────
 
     const hasSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-
-    if (!hasSpeech) {
-      bdMicBtn.style.display    = 'none';
-      bdMicStatus.style.display = 'none';
-    }
+    if (!hasSpeech) bdMicBtn.style.display = 'none';
 
     let recognition     = null;
     let isRecording     = false;
@@ -746,51 +740,34 @@
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
-
       recognition.onresult = e => {
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) {
-            finalTranscript += e.results[i][0].transcript + ' ';
-          } else {
-            interim += e.results[i][0].transcript;
-          }
+          if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + ' ';
+          else interim += e.results[i][0].transcript;
         }
-        braindumpText.value = (finalTranscript + interim).trim();
+        bdChatInput.value = (finalTranscript + interim).trim();
       };
-
-      recognition.onend = () => {
-        if (isRecording) {
-          try { recognition.start(); } catch (e) {}
-        }
-      };
-
-      recognition.onerror = e => {
-        if (e.error !== 'no-speech') stopRecording();
-      };
-
+      recognition.onend = () => { if (isRecording) try { recognition.start(); } catch(e) {} };
+      recognition.onerror = e => { if (e.error !== 'no-speech') stopRecording(); };
       return true;
     }
 
     function startRecording() {
-      if (!recognition && !initSpeech()) {
-        bdMicStatus.textContent = 'voice not supported — type below';
-        return;
-      }
-      finalTranscript = braindumpText.value;
+      if (!recognition && !initSpeech()) return;
+      finalTranscript = bdChatInput.value;
       isRecording = true;
-      try { recognition.start(); } catch (e) {}
+      try { recognition.start(); } catch(e) {}
       bdMicBtn.classList.add('recording');
-      bdMicStatus.textContent = 'listening…';
     }
 
     function stopRecording() {
       isRecording = false;
-      if (recognition) try { recognition.stop(); } catch (e) {}
+      if (recognition) try { recognition.stop(); } catch(e) {}
       bdMicBtn.classList.remove('recording');
-      bdMicStatus.textContent = braindumpText.value.trim()
-        ? 'tap sort it when done'
-        : 'tap to speak';
+      // Auto-send if there's content
+      const text = bdChatInput.value.trim();
+      if (text) sendUserMessage(text);
     }
 
     bdMicBtn.addEventListener('click', () => {
@@ -798,25 +775,115 @@
       else startRecording();
     });
 
-    // ── Brain dump open/close ─────────────────────────────────────────────────
+    // ── Chat UI ───────────────────────────────────────────────────────────────
+
+    function appendMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = role === 'user' ? 'bd-msg bd-msg-user' : 'bd-msg bd-msg-bot';
+      // Strip TASKS:[...] from displayed text
+      div.textContent = text.replace(/TASKS:\s*\[[\s\S]*?\]/g, '').trim();
+      bdChatMessages.appendChild(div);
+      bdChatMessages.scrollTop = bdChatMessages.scrollHeight;
+    }
+
+    function setTyping(on) {
+      bdStatus.textContent = on ? 'thinking…' : '';
+      bdChatInput.disabled = on;
+      chatWaiting = on;
+    }
+
+    function normalizeQ(raw) {
+      if (!raw) return null;
+      const s = String(raw).toLowerCase().replace(/[\s_]/g, '-');
+      if (['easy-today','hard-today','easy-later','hard-later'].includes(s)) return s;
+      const isHard = s.includes('hard'), isLater = s.includes('later');
+      if (isHard && isLater) return 'hard-later';
+      if (isHard)            return 'hard-today';
+      if (isLater)           return 'easy-later';
+      return 'easy-today';
+    }
+
+    function parseTasksFromReply(reply) {
+      const match = reply.match(/TASKS:\s*(\[[\s\S]*?\])/);
+      if (!match) return null;
+      try {
+        return JSON.parse(match[1])
+          .map(item => ({
+            task: (item.task || item.text || '').trim(),
+            quadrant: normalizeQ(item.q || item.quadrant)
+          }))
+          .filter(i => i.task);
+      } catch { return null; }
+    }
+
+    async function sendUserMessage(text) {
+      if (!text || chatWaiting) return;
+      bdChatInput.value = '';
+      finalTranscript = '';
+      appendMessage('user', text);
+      chatHistory.push({ role: 'user', content: text });
+      setTyping(true);
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({ messages: chatHistory }),
+        });
+        const { reply } = await res.json();
+        chatHistory.push({ role: 'assistant', content: reply });
+        appendMessage('assistant', reply);
+
+        const tasks = parseTasksFromReply(reply);
+        if (tasks?.length) {
+          bdExtracted = tasks;
+          setTimeout(() => {
+            bdPhaseInput.classList.add('hidden');
+            bdPhaseResults.classList.remove('hidden');
+            renderReviewList();
+          }, 600);
+        }
+      } catch(e) {
+        appendMessage('assistant', 'Something went wrong — check your connection and try again.');
+      }
+
+      setTyping(false);
+    }
+
+    document.getElementById('bd-send-btn').addEventListener('click', () => {
+      const text = bdChatInput.value.trim();
+      if (text) sendUserMessage(text);
+    });
+
+    bdChatInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); const t = bdChatInput.value.trim(); if (t) sendUserMessage(t); }
+    });
+
+    // ── Open / close ──────────────────────────────────────────────────────────
 
     function openBraindump() {
       braindumpOverlay.classList.remove('hidden');
-      setTimeout(() => hasSpeech ? bdMicBtn.focus() : braindumpText.focus(), 50);
+      if (chatHistory.length === 0) {
+        appendMessage('assistant', "What's on your mind? Speak or type — I'll help sort it out.");
+      }
+      setTimeout(() => bdChatInput.focus(), 50);
     }
 
     function closeBraindump() {
       stopRecording();
       braindumpOverlay.classList.add('hidden');
-      braindumpText.value = '';
-      finalTranscript = '';
       bdPhaseResults.classList.add('hidden');
       bdPhaseInput.classList.remove('hidden');
-      braindumpStatus.textContent = '';
-      braindumpSortBtn.disabled = false;
-      if (hasSpeech) bdMicStatus.textContent = 'tap to speak';
-      document.getElementById('bd-review-list').innerHTML = '';
+      bdChatMessages.innerHTML = '';
+      bdChatInput.value = '';
+      bdStatus.textContent = '';
+      chatHistory = [];
       bdExtracted = [];
+      chatWaiting = false;
+      document.getElementById('bd-review-list').innerHTML = '';
     }
 
     braindumpLink.addEventListener('click', openBraindump);
@@ -824,119 +891,6 @@
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && !braindumpOverlay.classList.contains('hidden')) closeBraindump();
     });
-
-    braindumpText.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        braindumpSortBtn.click();
-      }
-    });
-
-    // ── LLM loading ───────────────────────────────────────────────────────────
-
-    async function loadBdModel() {
-      if (bdGenerator) return bdGenerator;
-      if (bdModelLoading) return null;
-      bdModelLoading = true;
-      const bdSeen = localStorage.getItem('bd-model-ready');
-      braindumpStatus.textContent = bdSeen ? 'loading from cache…' : 'loading model… (first time ~400mb, then cached)';
-      try {
-        const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/transformers.min.js');
-        env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/';
-        env.useBrowserCache = true;
-        bdGenerator = await pipeline('text-generation', BD_MODEL, {
-          dtype: 'q4',
-          progress_callback: info => {
-            if (info.status === 'downloading') {
-              const pct = info.total ? Math.round((info.loaded / info.total) * 100) : '…';
-              braindumpStatus.textContent = `downloading model… ${pct}%`;
-            } else if (info.status === 'loading') {
-              braindumpStatus.textContent = bdSeen ? 'loading from cache…' : 'loading model…';
-            }
-          }
-        });
-        localStorage.setItem('bd-model-ready', '1');
-        bdModelLoading = false;
-        return bdGenerator;
-      } catch (err) {
-        bdModelLoading = false;
-        console.error('Brain dump model error:', err);
-        return null;
-      }
-    }
-
-    // ── Rule-based fallback extractor (no model needed) ──────────────────────
-
-    function extractTasksSimple(text) {
-      const LATER = /\b(later|eventually|someday|one day|maybe|perhaps|at some point|when i have time|next week|next month|in the future)\b/i;
-      const HARD  = /\b(plan|research|write|create|design|build|set up|figure out|work on|develop|organize|prepare|draft|review|analyze|fix|implement|launch|finish|complete|schedule|book)\b/i;
-      const INTRO = /^(i need to|i want to|i should|i have to|i must|i'd like to|i gotta|need to|want to|should|have to|must|gotta|let me|i will|i'll)\s*/i;
-
-      const parts = text
-        .split(/(?=[.!?]\s)|(?=\bI\s+(?:need|want|should|have|must|gotta|would like|also need|also want)\b)/i)
-        .flatMap(s => s.split(/,\s*(?=and\s|also\s|I\s)/i))
-        .map(s => s.replace(/[.!?,]+$/, '').trim())
-        .filter(s => s.length > 3);
-
-      return parts.map(phrase => {
-        const task = phrase.replace(INTRO, '').trim();
-        if (!task || task.length < 3) return null;
-        const isLater = LATER.test(phrase);
-        const isHard  = HARD.test(task);
-        const quadrant = isHard
-          ? (isLater ? 'hard-later' : 'hard-today')
-          : (isLater ? 'easy-later' : 'easy-today');
-        return { task: task.charAt(0).toUpperCase() + task.slice(1), quadrant };
-      }).filter(Boolean).slice(0, 20);
-    }
-
-    // ── Task extraction from free-form blob ───────────────────────────────────
-
-    async function extractTasksFromBlob(text, gen) {
-      const messages = [
-        {
-          role: 'system',
-          content:
-            'Extract tasks from a brain dump. Classify each as easy-today, hard-today, easy-later, or hard-later.\n' +
-            'easy=quick/low-effort. hard=needs focus or multiple steps.\n' +
-            'today=default unless the user said "later","eventually","someday","one day","maybe","at some point".\n' +
-            'Reply ONLY with JSON array:\n' +
-            '[{"task":"drink water","q":"easy-today"},{"task":"call dentist eventually","q":"easy-later"}]'
-        },
-        { role: 'user', content: text }
-      ];
-
-      const result = await gen(messages, { max_new_tokens: 512, temperature: 0.15, do_sample: false });
-      const reply  = result[0].generated_text.at(-1).content.trim();
-
-      const start = reply.indexOf('[');
-      const end   = reply.lastIndexOf(']');
-      if (start === -1 || end <= start) throw new Error('No JSON array in response');
-
-      const parsed = JSON.parse(reply.slice(start, end + 1));
-
-      function normalizeQ(raw) {
-        if (!raw) return null;
-        const s = String(raw).toLowerCase().replace(/[\s_]/g, '-');
-        if (['easy-today','hard-today','easy-later','hard-later'].includes(s)) return s;
-        const isHard  = s.includes('hard');
-        const isLater = s.includes('later');
-        if (isHard  && isLater)  return 'hard-later';
-        if (isHard)              return 'hard-today';
-        if (isLater)             return 'easy-later';
-        if (s.includes('easy'))  return 'easy-today';
-        return null;
-      }
-
-      return parsed
-        .map(item => {
-          const task = (item.task || item.text || item.name || '').trim();
-          const q    = normalizeQ(item.q || item.quadrant || item.category);
-          return (task && q) ? { task, quadrant: q } : null;
-        })
-        .filter(Boolean)
-        .slice(0, 25);
-    }
 
     // ── Review list ───────────────────────────────────────────────────────────
 
@@ -952,7 +906,7 @@
       const ul = document.getElementById('bd-review-list');
       ul.innerHTML = '';
       bdExtracted.forEach((item, idx) => {
-        const li   = document.createElement('li');
+        const li    = document.createElement('li');
         li.className = 'bd-review-item';
 
         const badge = document.createElement('button');
@@ -972,10 +926,7 @@
         const rm = document.createElement('button');
         rm.className = 'bd-remove-btn';
         rm.textContent = '×';
-        rm.addEventListener('click', () => {
-          bdExtracted.splice(idx, 1);
-          renderReviewList();
-        });
+        rm.addEventListener('click', () => { bdExtracted.splice(idx, 1); renderReviewList(); });
 
         li.appendChild(badge);
         li.appendChild(span);
@@ -984,53 +935,11 @@
       });
     }
 
-    // ── Sort button ───────────────────────────────────────────────────────────
-
-    braindumpSortBtn.addEventListener('click', async () => {
-      const raw = braindumpText.value.trim();
-      if (!raw) return;
-
-      stopRecording();
-      braindumpSortBtn.disabled = true;
-
-      const gen = await loadBdModel();
-      if (!gen) {
-        braindumpStatus.textContent = 'something went wrong — try refreshing';
-        braindumpSortBtn.disabled = false;
-        return;
-      }
-
-      braindumpStatus.textContent = 'reading your thoughts…';
-      try {
-        bdExtracted = await extractTasksFromBlob(raw, gen);
-      } catch (err) {
-        console.error('Sort error:', err);
-        bdExtracted = [];
-      }
-
-      // Fallback: rule-based extraction if model returned nothing
-      if (!bdExtracted.length) {
-        bdExtracted = extractTasksSimple(raw);
-      }
-
-      if (!bdExtracted.length) {
-        braindumpStatus.textContent = 'nothing found — try rephrasing';
-        braindumpSortBtn.disabled = false;
-        return;
-      }
-
-      renderReviewList();
-      bdPhaseInput.classList.add('hidden');
-      bdPhaseResults.classList.remove('hidden');
-    });
-
     // ── Back button ───────────────────────────────────────────────────────────
 
     document.getElementById('bd-back-btn').addEventListener('click', () => {
       bdPhaseResults.classList.add('hidden');
       bdPhaseInput.classList.remove('hidden');
-      braindumpSortBtn.disabled = false;
-      braindumpStatus.textContent = '';
     });
 
     // ── Add all to board ──────────────────────────────────────────────────────
@@ -1044,21 +953,15 @@
       btn.textContent = 'adding…';
 
       const inserts = bdExtracted.map((item, i) => ({
-        user_id:    userId,
-        task_name:  item.task,
-        quadrant:   item.quadrant,
-        crossed_off: false,
-        day:        todayStr,
-        rolled_over: false,
-        position:   9999 + i
+        user_id: userId, task_name: item.task, quadrant: item.quadrant,
+        crossed_off: false, day: todayStr, rolled_over: false, position: 9999 + i
       }));
 
       const { data: inserted, error } = await sb.from('tasks').insert(inserts).select();
       if (error) {
         btn.disabled = false;
         btn.textContent = 'add to board';
-        console.error('Insert error:', error);
-        braindumpStatus.textContent = 'error saving — is the quadrant column added?';
+        bdStatus.textContent = 'error saving';
         return;
       }
 

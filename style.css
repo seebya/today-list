@@ -376,70 +376,12 @@ header p {
 
 .braindump-close:hover { opacity: 0.75; }
 
-/* ── Mic button ── */
-
-.bd-mic-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: none;
-  border: 1.5px solid rgba(30, 69, 29, 0.22);
-  color: #1e451d;
-  cursor: pointer;
-  margin-bottom: 0.65rem;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.bd-mic-btn:hover { border-color: rgba(30, 69, 29, 0.5); }
-
-.bd-mic-btn.recording {
-  border-color: #1e451d;
-  background: rgba(30, 69, 29, 0.06);
-  animation: mic-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(30, 69, 29, 0.15); }
-  50%       { box-shadow: 0 0 0 8px rgba(30, 69, 29, 0); }
-}
-
-.bd-mic-status {
-  font-family: 'Space Mono', monospace;
-  font-size: 0.7rem;
-  color: #1e451d;
-  opacity: 0.38;
-  margin-bottom: 1.5rem;
-  min-height: 1rem;
-}
-
-#braindump-text {
-  display: block;
-  width: 100%;
-  min-height: 140px;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid rgba(30, 69, 29, 0.12);
-  font-family: 'Space Mono', monospace;
-  font-size: 0.84rem;
-  color: #1e451d;
-  caret-color: #142e13;
-  resize: none;
-  outline: none;
-  line-height: 1.65;
-  padding: 0 0 0.9rem;
-  margin-bottom: 1.25rem;
-}
-
 .braindump-actions-row {
   display: flex;
   align-items: center;
   gap: 1.25rem;
 }
 
-#braindump-sort-btn,
 #bd-add-all-btn,
 #bd-back-btn {
   background: none;
@@ -452,22 +394,11 @@ header p {
   flex-shrink: 0;
 }
 
-#braindump-sort-btn:hover,
 #bd-add-all-btn:hover { background: rgba(30, 69, 29, 0.05); }
+#bd-add-all-btn:disabled { opacity: 0.35; cursor: default; }
 
 #bd-back-btn { opacity: 0.45; border-color: transparent; }
 #bd-back-btn:hover { opacity: 0.75; }
-
-#braindump-sort-btn:disabled,
-#bd-add-all-btn:disabled { opacity: 0.35; cursor: default; }
-
-#braindump-status {
-  font-family: 'Space Mono', monospace;
-  font-size: 0.7rem;
-  color: #1e451d;
-  opacity: 0.45;
-  line-height: 1.4;
-}
 
 /* ── Brain dump review list ── */
 
@@ -532,6 +463,112 @@ header p {
 }
 
 .bd-remove-btn:hover { opacity: 0.6; }
+
+/* ── Chat UI ── */
+
+.bd-chat-messages {
+  height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+  padding-right: 0.25rem;
+}
+
+.bd-msg {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  max-width: 88%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 2px;
+  color: #1e451d;
+}
+
+.bd-msg-bot {
+  align-self: flex-start;
+  background: rgba(30, 69, 29, 0.06);
+}
+
+.bd-msg-user {
+  align-self: flex-end;
+  background: rgba(30, 69, 29, 0.12);
+}
+
+.bd-chat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-top: 1px solid rgba(30, 69, 29, 0.1);
+  padding-top: 0.65rem;
+}
+
+.bd-chat-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.84rem;
+  color: #1e451d;
+  caret-color: #142e13;
+  padding: 0.25rem 0;
+}
+
+.bd-chat-input:disabled { opacity: 0.4; }
+
+.bd-send-btn {
+  background: none;
+  border: none;
+  font-family: 'Space Mono', monospace;
+  font-size: 1rem;
+  color: #1e451d;
+  opacity: 0.45;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.bd-send-btn:hover { opacity: 0.85; }
+
+.bd-chat-status {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.68rem;
+  color: #1e451d;
+  opacity: 0.4;
+  min-height: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.bd-mic-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: none;
+  border: 1px solid rgba(30, 69, 29, 0.2);
+  color: #1e451d;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.bd-mic-btn:hover { border-color: rgba(30, 69, 29, 0.5); }
+
+.bd-mic-btn.recording {
+  border-color: #1e451d;
+  background: rgba(30, 69, 29, 0.08);
+  animation: mic-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(30, 69, 29, 0.15); }
+  50%       { box-shadow: 0 0 0 6px rgba(30, 69, 29, 0); }
+}
 
 /* ── Hard task breakdown (in board) ── */
 
