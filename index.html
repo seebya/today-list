@@ -368,8 +368,8 @@
 
     // ── Board render ──────────────────────────────────────────────────────────
 
-    function inferQuadrant(task) {
-      return task.day === todayStr ? 'easy-today' : 'easy-later';
+    function inferQuadrant() {
+      return 'easy-today';
     }
 
     function clearBoard() {
@@ -389,6 +389,20 @@
         .order('created_at', { ascending: true });
 
       const loaded = tasks || [];
+
+      // One-time fix: first migration incorrectly set uncrossed tasks to easy-later
+      if (!localStorage.getItem('q-fix-1')) {
+        try {
+          await sb.from('tasks')
+            .update({ quadrant: 'easy-today' })
+            .eq('user_id', userId)
+            .eq('quadrant', 'easy-later')
+            .eq('crossed_off', false);
+          localStorage.setItem('q-fix-1', '1');
+          loaded.filter(t => t.quadrant === 'easy-later' && !t.crossed_off)
+                .forEach(t => { t.quadrant = 'easy-today'; });
+        } catch (e) {}
+      }
 
       // Backfill quadrant for old tasks that have none
       const needsQuadrant = loaded.filter(t => !t.quadrant);
@@ -851,6 +865,31 @@
       }
     }
 
+    // ── Rule-based fallback extractor (no model needed) ──────────────────────
+
+    function extractTasksSimple(text) {
+      const LATER = /\b(later|eventually|someday|one day|maybe|perhaps|at some point|when i have time|next week|next month|in the future)\b/i;
+      const HARD  = /\b(plan|research|write|create|design|build|set up|figure out|work on|develop|organize|prepare|draft|review|analyze|fix|implement|launch|finish|complete|schedule|book)\b/i;
+      const INTRO = /^(i need to|i want to|i should|i have to|i must|i'd like to|i gotta|need to|want to|should|have to|must|gotta|let me|i will|i'll)\s*/i;
+
+      const parts = text
+        .split(/(?=[.!?]\s)|(?=\bI\s+(?:need|want|should|have|must|gotta|would like|also need|also want)\b)/i)
+        .flatMap(s => s.split(/,\s*(?=and\s|also\s|I\s)/i))
+        .map(s => s.replace(/[.!?,]+$/, '').trim())
+        .filter(s => s.length > 3);
+
+      return parts.map(phrase => {
+        const task = phrase.replace(INTRO, '').trim();
+        if (!task || task.length < 3) return null;
+        const isLater = LATER.test(phrase);
+        const isHard  = HARD.test(task);
+        const quadrant = isHard
+          ? (isLater ? 'hard-later' : 'hard-today')
+          : (isLater ? 'easy-later' : 'easy-today');
+        return { task: task.charAt(0).toUpperCase() + task.slice(1), quadrant };
+      }).filter(Boolean).slice(0, 20);
+    }
+
     // ── Task extraction from free-form blob ───────────────────────────────────
 
     async function extractTasksFromBlob(text, gen) {
@@ -964,19 +1003,25 @@
       braindumpStatus.textContent = 'reading your thoughts…';
       try {
         bdExtracted = await extractTasksFromBlob(raw, gen);
-        if (!bdExtracted.length) {
-          braindumpStatus.textContent = 'nothing found — try rephrasing';
-          braindumpSortBtn.disabled = false;
-          return;
-        }
-        renderReviewList();
-        bdPhaseInput.classList.add('hidden');
-        bdPhaseResults.classList.remove('hidden');
       } catch (err) {
         console.error('Sort error:', err);
-        braindumpStatus.textContent = 'something went wrong';
-        braindumpSortBtn.disabled = false;
+        bdExtracted = [];
       }
+
+      // Fallback: rule-based extraction if model returned nothing
+      if (!bdExtracted.length) {
+        bdExtracted = extractTasksSimple(raw);
+      }
+
+      if (!bdExtracted.length) {
+        braindumpStatus.textContent = 'nothing found — try rephrasing';
+        braindumpSortBtn.disabled = false;
+        return;
+      }
+
+      renderReviewList();
+      bdPhaseInput.classList.add('hidden');
+      bdPhaseResults.classList.remove('hidden');
     });
 
     // ── Back button ───────────────────────────────────────────────────────────
