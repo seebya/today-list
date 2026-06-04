@@ -10,20 +10,17 @@
 </head>
 <body>
   <div class="paper-overlay"></div>
-  <div class="fold"></div>
 
-  <!-- Fixed top-left: your chosen icon, opens profile -->
+  <!-- Fixed top-left icon -->
   <button id="account-btn" class="account-btn" title="your profile"></button>
 
-  <!-- Profile overlay — full page -->
+  <!-- Profile overlay -->
   <div id="profile-overlay" class="profile-overlay hidden">
     <div class="paper">
-
       <section class="profile-section">
         <p class="section-label">your icon</p>
         <div class="icon-grid" id="icon-grid"></div>
       </section>
-
       <section class="profile-section">
         <div id="auth-form-area">
           <p class="section-label">save your list</p>
@@ -35,15 +32,12 @@
         <div id="auth-user-area" class="hidden">
           <p class="section-label">account</p>
           <p id="auth-user-label"></p>
-          <button id="auth-export-btn">export today</button>
           <button id="auth-signout-btn">sign out</button>
         </div>
       </section>
-
     </div>
   </div>
 
-  <!-- Same icon, shown at top-left when profile is open — click to close -->
   <button id="profile-close" class="profile-close hidden"></button>
 
   <main class="paper">
@@ -52,9 +46,45 @@
       <p id="date"></p>
     </header>
 
-    <ul id="task-list"></ul>
-    <input type="text" id="task-input" autocomplete="off" spellcheck="false" />
-    <button id="braindump-link" class="braindump-link">brain dump</button>
+    <!-- Brain dump entry -->
+    <button id="braindump-link" class="braindump-link">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <rect x="9" y="2" width="6" height="12" rx="3"/>
+        <path d="M5 10a7 7 0 0 0 14 0"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
+        <line x1="9" y1="21" x2="15" y2="21"/>
+      </svg>
+      brain dump
+    </button>
+
+    <!-- 4-quadrant board -->
+    <div class="board-section">
+      <div class="board-row">
+        <div>
+          <p class="quadrant-label">easy · today</p>
+          <ul class="board-list" id="bl-easy-today"></ul>
+        </div>
+        <div>
+          <p class="quadrant-label">hard · today</p>
+          <ul class="board-list" id="bl-hard-today"></ul>
+        </div>
+      </div>
+
+      <hr class="board-divider">
+
+      <div class="board-row board-later">
+        <div>
+          <p class="quadrant-label">easy · later</p>
+          <ul class="board-list" id="bl-easy-later"></ul>
+        </div>
+        <div>
+          <p class="quadrant-label">hard · later</p>
+          <ul class="board-list" id="bl-hard-later"></ul>
+        </div>
+      </div>
+    </div>
+
+    <input type="text" id="task-input" placeholder="quick add → easy today" autocomplete="off" spellcheck="false" />
   </main>
 
   <!-- Brain dump overlay -->
@@ -63,87 +93,78 @@
       <div class="braindump-header">
         <button id="braindump-close" class="braindump-close">×</button>
       </div>
-      <div id="braindump-phase-input">
-        <textarea id="braindump-text" placeholder="everything in your head. one thought per line." autocomplete="off" spellcheck="false"></textarea>
+
+      <!-- Phase 1: capture (voice or text) -->
+      <div id="bd-phase-input">
+        <button id="bd-mic-btn" class="bd-mic-btn" title="tap to speak">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <rect x="9" y="2" width="6" height="12" rx="3"/>
+            <path d="M5 10a7 7 0 0 0 14 0"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+            <line x1="9" y1="21" x2="15" y2="21"/>
+          </svg>
+        </button>
+        <p id="bd-mic-status" class="bd-mic-status">tap to speak</p>
+        <textarea id="braindump-text" placeholder="or type freely — stream of consciousness, no formatting needed" autocomplete="off" spellcheck="false"></textarea>
         <div class="braindump-actions-row">
           <button id="braindump-sort-btn">sort it</button>
           <p id="braindump-status"></p>
         </div>
       </div>
-      <div id="braindump-phase-results" class="hidden">
-        <div class="quadrant-grid">
-          <div class="quadrant">
-            <p class="quadrant-label">easy · today</p>
-            <ul class="quadrant-list" id="ql-easy-today"></ul>
-          </div>
-          <div class="quadrant">
-            <p class="quadrant-label">hard · today</p>
-            <ul class="quadrant-list" id="ql-hard-today"></ul>
-          </div>
-          <div class="quadrant">
-            <p class="quadrant-label">easy · later</p>
-            <ul class="quadrant-list" id="ql-easy-later"></ul>
-          </div>
-          <div class="quadrant">
-            <p class="quadrant-label">hard · later</p>
-            <ul class="quadrant-list" id="ql-hard-later"></ul>
-          </div>
-        </div>
-        <div class="braindump-result-actions">
-          <button id="braindump-add-today-btn">add today tasks to list</button>
-          <button id="braindump-add-tomorrow-btn">send later tasks to tomorrow</button>
+
+      <!-- Phase 2: review extracted tasks -->
+      <div id="bd-phase-results" class="hidden">
+        <p class="bd-review-label">tap badge to change · × to remove</p>
+        <ul id="bd-review-list" class="bd-review-list"></ul>
+        <div class="braindump-actions-row">
+          <button id="bd-add-all-btn">add to board</button>
+          <button id="bd-back-btn">back</button>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- Context menu -->
   <div id="task-menu" class="task-menu hidden">
     <button id="menu-edit">edit</button>
     <button id="menu-delete">delete</button>
-    <button id="menu-push">push to tomorrow</button>
+    <div class="menu-divider"></div>
+    <button id="menu-move-et">→ easy · today</button>
+    <button id="menu-move-ht">→ hard · today</button>
+    <button id="menu-move-el">→ easy · later</button>
+    <button id="menu-move-hl">→ hard · later</button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script>
+    /*
+     * MIGRATION — run once in Supabase SQL editor:
+     * ALTER TABLE tasks ADD COLUMN IF NOT EXISTS quadrant TEXT;
+     */
+
     const SUPABASE_URL = 'https://azitxesbwldyqfpqylby.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_LishKGyfBaBZHyzs4uJ23Q_8rxWCq3a';
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Local date — toISOString() is UTC and shows wrong day in UTC+ timezones
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
-    const todayStr     = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-    const tomorrowD    = new Date(d); tomorrowD.setDate(d.getDate() + 1);
-    const tomorrowStr  = `${tomorrowD.getFullYear()}-${pad(tomorrowD.getMonth()+1)}-${pad(tomorrowD.getDate())}`;
-    const yesterdayD   = new Date(d); yesterdayD.setDate(d.getDate() - 1);
-    const yesterdayStr = `${yesterdayD.getFullYear()}-${pad(yesterdayD.getMonth()+1)}-${pad(yesterdayD.getDate())}`;
-
+    const todayStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
     function fmtDisplay(s) { return s.replace(/-/g, ' '); }
     document.getElementById('date').textContent = fmtDisplay(todayStr);
 
-    // ── Icons — 10 circular line drawings, all 20×20 viewBox ─────────────────
+    // ── Icons ─────────────────────────────────────────────────────────────────
 
     const ICON_INNER = [
-      // 0: plain circle
       '',
-      // 1: concentric circles
       '<circle cx="10" cy="10" r="4.5" stroke="currentColor" stroke-width="1.2" fill="none"/>',
-      // 2: square within circle
       '<rect x="5.5" y="5.5" width="9" height="9" stroke="currentColor" stroke-width="1.2" fill="none"/>',
-      // 3: triangle within circle (equilateral, inscribed)
       '<polygon points="10,1.5 17.36,14.25 2.64,14.25" stroke="currentColor" stroke-width="1.2" fill="none"/>',
-      // 4: diamond within circle (square rotated 45°, inscribed)
       '<polygon points="10,1.5 18.5,10 10,18.5 1.5,10" stroke="currentColor" stroke-width="1.2" fill="none"/>',
-      // 5: cross — edge to edge horizontal + vertical
       '<line x1="10" y1="1.5" x2="10" y2="18.5" stroke="currentColor" stroke-width="1.2"/><line x1="1.5" y1="10" x2="18.5" y2="10" stroke="currentColor" stroke-width="1.2"/>',
-      // 6: peace sign — vertical line + two arms from centre
       '<line x1="10" y1="1.5" x2="10" y2="18.5" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="10" x2="5.75" y2="17.36" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="10" x2="14.25" y2="17.36" stroke="currentColor" stroke-width="1.2"/>',
-      // 7: 3-way spokes from centre (120° apart)
       '<line x1="10" y1="10" x2="10" y2="1.5" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="10" x2="17.36" y2="14.25" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="10" x2="2.64" y2="14.25" stroke="currentColor" stroke-width="1.2"/>',
-      // 8: pie chart — one 120° sector outline
       '<path d="M10 10 L10 1.5 A8.5 8.5 0 0 1 17.36 14.25 Z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/>',
-      // 9: asterisk — 3 full diameters at 60° apart
       '<line x1="10" y1="1.5" x2="10" y2="18.5" stroke="currentColor" stroke-width="1.2"/><line x1="17.36" y1="5.75" x2="2.64" y2="14.25" stroke="currentColor" stroke-width="1.2"/><line x1="2.64" y1="5.75" x2="17.36" y2="14.25" stroke="currentColor" stroke-width="1.2"/>',
     ];
 
@@ -154,12 +175,8 @@
 
     // ── DOM refs ──────────────────────────────────────────────────────────────
 
-    const input          = document.getElementById('task-input');
+    const taskInput      = document.getElementById('task-input');
     const braindumpLink  = document.getElementById('braindump-link');
-    const list           = document.getElementById('task-list');
-    const fold           = document.querySelector('.fold');
-    const headerTitle    = document.querySelector('header h1');
-    const dateEl         = document.getElementById('date');
     const accountBtn     = document.getElementById('account-btn');
     const profileOverlay = document.getElementById('profile-overlay');
     const profileClose   = document.getElementById('profile-close');
@@ -172,11 +189,9 @@
 
     // ── State ─────────────────────────────────────────────────────────────────
 
-    let view             = 'today';
     let userId           = null;
     let currentUserEmail = null;
     let currentIconIndex = 0;
-    let sortableInstance = null;
     let authInitialized  = false;
 
     // ── Icon UI ───────────────────────────────────────────────────────────────
@@ -244,25 +259,20 @@
     accountBtn.addEventListener('click', showProfileOverlay);
     profileClose.addEventListener('click', hideProfileOverlay);
 
-    // ── Auth actions ──────────────────────────────────────────────────────────
-
     document.getElementById('auth-send-btn').addEventListener('click', async () => {
       const email = authEmailInput.value.trim();
       if (!email) return;
       authStatus.textContent = 'sending...';
-
-      // Save current tasks to localStorage so they transfer after sign-in redirect
       if (userId) {
         try {
           const { data: tasks } = await sb.from('tasks')
-            .select('task_name, day, crossed_off, rolled_over, position')
+            .select('task_name, day, crossed_off, rolled_over, position, quadrant')
             .eq('user_id', userId);
           if (tasks?.length) {
             localStorage.setItem('today-list-transfer', JSON.stringify({ tasks, ts: Date.now() }));
           }
         } catch (e) {}
       }
-
       const { error } = await sb.auth.signInWithOtp({
         email,
         options: { emailRedirectTo: location.origin + location.pathname }
@@ -279,30 +289,16 @@
       if (e.key === 'Enter') document.getElementById('auth-send-btn').click();
     });
 
-    document.getElementById('auth-export-btn').addEventListener('click', () => {
-      const items = [...list.querySelectorAll('.task-item')];
-      const lines = [`T O D A Y — ${fmtDisplay(todayStr)}`, ''];
-      items.forEach(li => {
-        lines.push(`${li.classList.contains('crossed') ? '×' : '·'} ${li.querySelector('span').textContent}`);
-      });
-      const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-      const url  = URL.createObjectURL(blob);
-      const a    = Object.assign(document.createElement('a'), { href: url, download: `today-${todayStr}.txt` });
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a); URL.revokeObjectURL(url);
-    });
-
     document.getElementById('auth-signout-btn').addEventListener('click', async () => {
       authInitialized = false;
       await sb.auth.signOut();
       hideProfileOverlay();
       updateAccountUI(null);
-      list.innerHTML = '';
+      clearBoard();
       userId = null;
       await init();
     });
 
-    // Handle magic-link callbacks — fires after authInitialized = true
     sb.auth.onAuthStateChange(async (event, session) => {
       if (!authInitialized) return;
       if (event === 'SIGNED_IN' && session?.user?.email) {
@@ -311,7 +307,7 @@
         currentIconIndex = loadIconPref(session);
         updateIconButtons();
         updateAccountUI(session.user.email);
-        await renderToday();
+        await renderBoard();
         hideProfileOverlay();
       } else if (event === 'SIGNED_OUT') {
         userId = null;
@@ -319,7 +315,7 @@
       }
     });
 
-    // ── Task transfer: anonymous → email account ───────────────────────────────
+    // ── Task transfer ─────────────────────────────────────────────────────────
 
     async function maybeTransferTasks(newUserId) {
       const stored = localStorage.getItem('today-list-transfer');
@@ -366,91 +362,86 @@
         updateAccountUI(null);
       }
 
-      await sb.from('tasks')
-        .update({ day: todayStr, rolled_over: true })
-        .eq('user_id', userId)
-        .eq('day', yesterdayStr)
-        .eq('crossed_off', false);
-
-      await renderToday();
+      await renderBoard();
       authInitialized = true;
     }
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    // ── Board render ──────────────────────────────────────────────────────────
 
-    async function renderToday() {
-      view = 'today';
-      headerTitle.textContent = 'T O D A Y';
-      dateEl.textContent = fmtDisplay(todayStr);
-      input.style.display = '';
-      braindumpLink.style.display = '';
-      list.innerHTML = '';
-
-      const { data: tasks } = await sb.from('tasks')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('day', todayStr)
-        .order('position', { ascending: true })
-        .order('rolled_over', { ascending: false })
-        .order('created_at', { ascending: true });
-
-      const loaded = tasks || [];
-      if (loaded.some(t => t.position == null)) {
-        await Promise.all(loaded.map((t, i) =>
-          sb.from('tasks').update({ position: i }).eq('id', t.id)
-        ));
-      }
-      loaded.forEach(task => list.appendChild(makeTask(task, 'today')));
-      initSortable();
+    function inferQuadrant(task) {
+      return task.day === todayStr ? 'easy-today' : 'easy-later';
     }
 
-    async function renderTomorrow() {
-      view = 'tomorrow';
-      headerTitle.textContent = 'T O M O R R O W';
-      dateEl.textContent = fmtDisplay(tomorrowStr);
-      input.style.display = 'none';
-      braindumpLink.style.display = 'none';
-      list.innerHTML = '';
-
-      const { data: tasks } = await sb.from('tasks')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('day', tomorrowStr)
-        .order('position', { ascending: true })
-        .order('created_at', { ascending: true });
-
-      const loaded = tasks || [];
-      if (loaded.some(t => t.position == null)) {
-        await Promise.all(loaded.map((t, i) =>
-          sb.from('tasks').update({ position: i }).eq('id', t.id)
-        ));
-      }
-      loaded.forEach(task => list.appendChild(makeTask(task, 'tomorrow')));
-      initSortable();
-    }
-
-    fold.addEventListener('click', () => {
-      if (view === 'today') renderTomorrow();
-      else renderToday();
-    });
-
-    function initSortable() {
-      if (sortableInstance) sortableInstance.destroy();
-      sortableInstance = Sortable.create(list, {
-        animation: 150,
-        ghostClass: 'task-ghost',
-        chosenClass: 'task-chosen',
-        delay: 200,
-        delayOnTouchOnly: true,
-        onEnd: saveOrder
+    function clearBoard() {
+      ['easy-today','hard-today','easy-later','hard-later'].forEach(q => {
+        document.getElementById(`bl-${q}`).innerHTML = '';
       });
     }
 
-    async function saveOrder() {
-      const items = [...list.querySelectorAll('.task-item[data-id]')];
-      await Promise.all(items.map((el, i) =>
-        sb.from('tasks').update({ position: i }).eq('id', el.dataset.id)
-      ));
+    async function renderBoard() {
+      clearBoard();
+
+      const { data: tasks } = await sb.from('tasks')
+        .select('*')
+        .eq('user_id', userId)
+        .or(`crossed_off.eq.false,day.eq.${todayStr}`)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      const loaded = tasks || [];
+
+      // Backfill quadrant for old tasks that have none
+      const needsQuadrant = loaded.filter(t => !t.quadrant);
+      if (needsQuadrant.length) {
+        for (const t of needsQuadrant) {
+          t.quadrant = inferQuadrant(t);
+        }
+        try {
+          await Promise.all(needsQuadrant.map(t =>
+            sb.from('tasks').update({ quadrant: t.quadrant }).eq('id', t.id)
+          ));
+        } catch (e) {
+          console.warn('quadrant column not found — run the SQL migration in Supabase');
+        }
+      }
+
+      const buckets = { 'easy-today': [], 'hard-today': [], 'easy-later': [], 'hard-later': [] };
+      loaded.forEach(t => {
+        const q = t.quadrant || inferQuadrant(t);
+        if (buckets[q]) buckets[q].push(t);
+      });
+
+      ['easy-today','hard-today','easy-later','hard-later'].forEach(q => {
+        const ul = document.getElementById(`bl-${q}`);
+        buckets[q].forEach(t => ul.appendChild(makeTask(t)));
+      });
+
+      initSortables();
+    }
+
+    function addTaskToBoard(task) {
+      const q = task.quadrant || inferQuadrant(task);
+      const ul = document.getElementById(`bl-${q}`);
+      if (ul) ul.appendChild(makeTask(task));
+    }
+
+    function initSortables() {
+      ['easy-today','hard-today','easy-later','hard-later'].forEach(q => {
+        const ul = document.getElementById(`bl-${q}`);
+        Sortable.create(ul, {
+          animation: 150,
+          ghostClass: 'task-ghost',
+          chosenClass: 'task-chosen',
+          delay: 200,
+          delayOnTouchOnly: true,
+          onEnd: () => {
+            const items = [...ul.querySelectorAll('.task-item[data-id]')];
+            Promise.all(items.map((el, i) =>
+              sb.from('tasks').update({ position: i }).eq('id', el.dataset.id)
+            ));
+          }
+        });
+      });
     }
 
     // ── Task UI ───────────────────────────────────────────────────────────────
@@ -508,25 +499,31 @@
       setTimeout(cb, 210);
     }
 
-    function pushToTomorrow(li, task) {
-      fadeOut(li, async () => {
-        await sb.from('tasks').update({ day: tomorrowStr, rolled_over: false }).eq('id', task.id);
-        li.remove();
-      });
+    async function moveToQuadrant(li, task, targetQ) {
+      if (li.dataset.quadrant === targetQ) return;
+      const targetUl = document.getElementById(`bl-${targetQ}`);
+      if (!targetUl) return;
+
+      li.style.transition = 'opacity 180ms ease';
+      li.style.opacity = '0';
+      setTimeout(async () => {
+        await sb.from('tasks').update({ quadrant: targetQ }).eq('id', task.id);
+        task.quadrant = targetQ;
+        li.dataset.quadrant = targetQ;
+        li.style.transition = 'opacity 180ms ease';
+        li.style.opacity = '1';
+        targetUl.appendChild(li);
+      }, 190);
     }
 
-    function pullToToday(li, task) {
-      fadeOut(li, async () => {
-        await sb.from('tasks').update({ day: todayStr }).eq('id', task.id);
-        li.remove();
-      });
-    }
-
-    function makeTask(task, context) {
+    function makeTask(task) {
+      const isHard = (task.quadrant || '').startsWith('hard');
       const li = document.createElement('li');
-      li.className = 'task-item';
+      li.className = 'task-item' + (isHard ? ' hard-task' : '');
       li.dataset.id = task.id;
+      li.dataset.quadrant = task.quadrant || inferQuadrant(task);
       if (task.crossed_off) li.classList.add('crossed');
+
       const span = document.createElement('span');
       span.textContent = task.task_name;
       li.appendChild(span);
@@ -535,59 +532,50 @@
         requestAnimationFrame(() => drawStrike(li, span, false));
       }
 
-      let touchStartX = 0, touchStartY = 0;
-      li.addEventListener('touchstart', e => {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-      }, { passive: true });
-      li.addEventListener('touchend', e => {
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        const dy = e.changedTouches[0].clientY - touchStartY;
-        if (Math.abs(dy) > Math.abs(dx)) return;
-        if (context === 'today') {
-          if (dx < -50) crossOff(li, task);
-          if (dx > 50) pushToTomorrow(li, task);
-        } else {
-          if (dx > 50) pullToToday(li, task);
-        }
-      });
+      li.addEventListener('click', () => crossOff(li, task));
+      li.addEventListener('contextmenu', e => { e.preventDefault(); showTaskMenu(e, li, task); });
 
-      if (context === 'today') {
-        li.addEventListener('click', () => crossOff(li, task));
-      } else {
-        li.addEventListener('click', () => pullToToday(li, task));
-      }
-      li.addEventListener('contextmenu', e => showTaskMenu(e, li, task, context));
+      // Long press for mobile
+      let longPressTimer;
+      li.addEventListener('touchstart', e => {
+        longPressTimer = setTimeout(() => {
+          const t = e.touches[0];
+          showTaskMenu({ clientX: t.clientX, clientY: t.clientY, preventDefault: () => {} }, li, task);
+        }, 500);
+      }, { passive: true });
+      li.addEventListener('touchend',  () => clearTimeout(longPressTimer), { passive: true });
+      li.addEventListener('touchmove', () => clearTimeout(longPressTimer), { passive: true });
 
       return li;
     }
 
-    // ── Add task ──────────────────────────────────────────────────────────────
+    // ── Quick add ─────────────────────────────────────────────────────────────
 
-    input.addEventListener('keydown', async function(e) {
+    taskInput.addEventListener('keydown', async function(e) {
       if (e.key !== 'Enter') return;
-      const text = input.value.trim();
+      const text = taskInput.value.trim();
       if (!text) return;
       if (!userId) { showProfileOverlay(); return; }
 
-      input.value = '';
+      taskInput.value = '';
 
+      const ul = document.getElementById('bl-easy-today');
       const { data: inserted, error } = await sb.from('tasks')
         .insert({
           user_id: userId, task_name: text, crossed_off: false,
           day: todayStr, rolled_over: false,
-          position: list.querySelectorAll('.task-item').length
+          quadrant: 'easy-today',
+          position: ul.querySelectorAll('.task-item').length
         })
         .select().single();
 
       if (error) {
-        console.error('insert error:', error);
-        input.value = text;
-        input.style.opacity = '0.4';
-        setTimeout(() => { input.style.opacity = ''; }, 900);
+        taskInput.value = text;
+        taskInput.style.opacity = '0.4';
+        setTimeout(() => { taskInput.style.opacity = ''; }, 900);
         return;
       }
-      if (inserted) list.appendChild(makeTask(inserted, 'today'));
+      if (inserted) addTaskToBoard(inserted);
     });
 
     // ── Context menu ──────────────────────────────────────────────────────────
@@ -595,19 +583,23 @@
     let menuTarget = null;
     const taskMenu = document.getElementById('task-menu');
 
-    function showTaskMenu(e, li, task, context) {
-      e.preventDefault();
-      menuTarget = { li, task, context };
-      document.getElementById('menu-push').textContent =
-        context === 'today' ? 'push to tomorrow' : 'pull to today';
+    function showTaskMenu(e, li, task) {
+      menuTarget = { li, task };
+
+      // Hide move option for current quadrant
+      const curQ = li.dataset.quadrant;
+      document.getElementById('menu-move-et').style.display = curQ === 'easy-today' ? 'none' : '';
+      document.getElementById('menu-move-ht').style.display = curQ === 'hard-today' ? 'none' : '';
+      document.getElementById('menu-move-el').style.display = curQ === 'easy-later' ? 'none' : '';
+      document.getElementById('menu-move-hl').style.display = curQ === 'hard-later' ? 'none' : '';
+
       taskMenu.classList.remove('hidden');
-      let x = e.clientX, y = e.clientY;
-      taskMenu.style.left = x + 'px';
-      taskMenu.style.top  = y + 'px';
+      taskMenu.style.left = e.clientX + 'px';
+      taskMenu.style.top  = e.clientY + 'px';
       requestAnimationFrame(() => {
         const r = taskMenu.getBoundingClientRect();
-        if (r.right  > window.innerWidth)  taskMenu.style.left = (x - r.width)  + 'px';
-        if (r.bottom > window.innerHeight) taskMenu.style.top  = (y - r.height) + 'px';
+        if (r.right  > window.innerWidth)  taskMenu.style.left = (e.clientX - r.width)  + 'px';
+        if (r.bottom > window.innerHeight) taskMenu.style.top  = (e.clientY - r.height) + 'px';
       });
     }
 
@@ -636,12 +628,18 @@
       });
     });
 
-    document.getElementById('menu-push').addEventListener('click', () => {
-      if (!menuTarget) return;
-      const { li, task, context } = menuTarget;
-      hideTaskMenu();
-      if (context === 'today') pushToTomorrow(li, task);
-      else pullToToday(li, task);
+    [
+      ['menu-move-et', 'easy-today'],
+      ['menu-move-ht', 'hard-today'],
+      ['menu-move-el', 'easy-later'],
+      ['menu-move-hl', 'hard-later'],
+    ].forEach(([id, q]) => {
+      document.getElementById(id).addEventListener('click', () => {
+        if (!menuTarget) return;
+        const { li, task } = menuTarget;
+        hideTaskMenu();
+        moveToQuadrant(li, task, q);
+      });
     });
 
     function startEdit(li, task) {
@@ -697,39 +695,114 @@
       editInput.addEventListener('blur', saveEdit);
     }
 
-    // ── Brain Dump ────────────────────────────────────────────────────────────────
+    // ── Brain Dump ────────────────────────────────────────────────────────────
 
     const BD_MODEL = 'onnx-community/Qwen2.5-0.5B-Instruct';
-    let bdGenerator = null;
+    let bdGenerator    = null;
     let bdModelLoading = false;
+    let bdExtracted    = []; // [{task, quadrant}]
 
-    const braindumpOverlay  = document.getElementById('braindump-overlay');
-    const braindumpClose    = document.getElementById('braindump-close');
-    const braindumpText     = document.getElementById('braindump-text');
-    const braindumpSortBtn  = document.getElementById('braindump-sort-btn');
-    const braindumpStatus   = document.getElementById('braindump-status');
-    const bdPhaseInput      = document.getElementById('braindump-phase-input');
-    const bdPhaseResults    = document.getElementById('braindump-phase-results');
+    const braindumpOverlay = document.getElementById('braindump-overlay');
+    const braindumpClose   = document.getElementById('braindump-close');
+    const braindumpText    = document.getElementById('braindump-text');
+    const braindumpSortBtn = document.getElementById('braindump-sort-btn');
+    const braindumpStatus  = document.getElementById('braindump-status');
+    const bdPhaseInput     = document.getElementById('bd-phase-input');
+    const bdPhaseResults   = document.getElementById('bd-phase-results');
+    const bdMicBtn         = document.getElementById('bd-mic-btn');
+    const bdMicStatus      = document.getElementById('bd-mic-status');
+
+    // ── Voice recording ───────────────────────────────────────────────────────
+
+    const hasSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+    if (!hasSpeech) {
+      bdMicBtn.style.display    = 'none';
+      bdMicStatus.style.display = 'none';
+    }
+
+    let recognition     = null;
+    let isRecording     = false;
+    let finalTranscript = '';
+
+    function initSpeech() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) return false;
+      recognition = new SR();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = e => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            finalTranscript += e.results[i][0].transcript + ' ';
+          } else {
+            interim += e.results[i][0].transcript;
+          }
+        }
+        braindumpText.value = (finalTranscript + interim).trim();
+      };
+
+      recognition.onend = () => {
+        if (isRecording) {
+          try { recognition.start(); } catch (e) {}
+        }
+      };
+
+      recognition.onerror = e => {
+        if (e.error !== 'no-speech') stopRecording();
+      };
+
+      return true;
+    }
+
+    function startRecording() {
+      if (!recognition && !initSpeech()) {
+        bdMicStatus.textContent = 'voice not supported — type below';
+        return;
+      }
+      finalTranscript = braindumpText.value;
+      isRecording = true;
+      try { recognition.start(); } catch (e) {}
+      bdMicBtn.classList.add('recording');
+      bdMicStatus.textContent = 'listening…';
+    }
+
+    function stopRecording() {
+      isRecording = false;
+      if (recognition) try { recognition.stop(); } catch (e) {}
+      bdMicBtn.classList.remove('recording');
+      bdMicStatus.textContent = braindumpText.value.trim()
+        ? 'tap sort it when done'
+        : 'tap to speak';
+    }
+
+    bdMicBtn.addEventListener('click', () => {
+      if (isRecording) stopRecording();
+      else startRecording();
+    });
+
+    // ── Brain dump open/close ─────────────────────────────────────────────────
 
     function openBraindump() {
       braindumpOverlay.classList.remove('hidden');
-      setTimeout(() => braindumpText.focus(), 50);
+      setTimeout(() => hasSpeech ? bdMicBtn.focus() : braindumpText.focus(), 50);
     }
 
     function closeBraindump() {
+      stopRecording();
       braindumpOverlay.classList.add('hidden');
       braindumpText.value = '';
+      finalTranscript = '';
       bdPhaseResults.classList.add('hidden');
       bdPhaseInput.classList.remove('hidden');
       braindumpStatus.textContent = '';
       braindumpSortBtn.disabled = false;
-      ['easy-today','hard-today','easy-later','hard-later'].forEach(q => {
-        document.getElementById(`ql-${q}`).innerHTML = '';
-      });
-      const addToday = document.getElementById('braindump-add-today-btn');
-      const addTmrw  = document.getElementById('braindump-add-tomorrow-btn');
-      addToday.disabled = false; addToday.textContent = 'add today tasks to list';
-      addTmrw.disabled = false;  addTmrw.textContent  = 'send later tasks to tomorrow';
+      if (hasSpeech) bdMicStatus.textContent = 'tap to speak';
+      document.getElementById('bd-review-list').innerHTML = '';
+      bdExtracted = [];
     }
 
     braindumpLink.addEventListener('click', openBraindump);
@@ -744,6 +817,8 @@
         braindumpSortBtn.click();
       }
     });
+
+    // ── LLM loading ───────────────────────────────────────────────────────────
 
     async function loadBdModel() {
       if (bdGenerator) return bdGenerator;
@@ -774,132 +849,110 @@
       }
     }
 
-    function parseDumpLines(raw) {
-      return raw.split('\n').map(l => l.trim()).filter(l => l.length > 1 && l.length < 300);
-    }
+    // ── Task extraction from free-form blob ───────────────────────────────────
 
-    async function classifyTasks(tasks, gen) {
-      const numberedList = tasks.map((t, i) => `${i + 1}. ${t}`).join('\n');
+    async function extractTasksFromBlob(text, gen) {
       const messages = [
         {
           role: 'system',
-          content: 'You classify tasks into exactly one of: easy-today, hard-today, easy-later, hard-later.\n' +
-                   'easy = quick/low-effort. hard = needs focus or planning. today = urgent. later = can wait.\n' +
-                   'Reply with ONLY: 1:easy-today 2:hard-later 3:easy-today — no other text.'
+          content:
+            'Extract discrete tasks or intentions from a stream-of-consciousness brain dump. ' +
+            'Classify each as one of: easy-today, hard-today, easy-later, hard-later.\n' +
+            'easy = quick/low-effort. hard = needs focus or planning. today = do now. later = can wait.\n' +
+            'Reply ONLY with a JSON array, no other text:\n' +
+            '[{"task":"go to the bathroom","q":"easy-today"},{"task":"write the quarterly report","q":"hard-later"}]'
         },
-        { role: 'user', content: numberedList }
+        { role: 'user', content: text }
       ];
-      const result = await gen(messages, { max_new_tokens: tasks.length * 12 + 20, temperature: 0.1, do_sample: false });
-      const reply = result[0].generated_text.at(-1).content.trim();
 
-      const valid = new Set(['easy-today','hard-today','easy-later','hard-later']);
-      const assignments = {};
-      for (const m of reply.matchAll(/(\d+)[:\-\s]+([a-z]+-[a-z]+)/g)) {
-        const idx = parseInt(m[1]) - 1;
-        const cat = m[2];
-        if (idx >= 0 && idx < tasks.length && valid.has(cat)) assignments[idx] = cat;
-      }
-      tasks.forEach((_, i) => { if (!assignments[i]) assignments[i] = 'easy-today'; });
-      return assignments;
+      const result = await gen(messages, { max_new_tokens: 512, temperature: 0.15, do_sample: false });
+      const reply  = result[0].generated_text.at(-1).content.trim();
+
+      const jsonMatch = reply.match(/\[[\s\S]*?\]/);
+      if (!jsonMatch) throw new Error('No JSON array in response');
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      const valid  = new Set(['easy-today','hard-today','easy-later','hard-later']);
+
+      return parsed
+        .filter(item => item.task && typeof item.task === 'string' && valid.has(item.q))
+        .map(item => ({ task: item.task.trim(), quadrant: item.q }))
+        .slice(0, 25);
     }
 
-    async function breakdownTask(task, gen) {
-      const messages = [
-        {
-          role: 'system',
-          content: 'Break a task into 3 to 5 concrete, actionable mini steps. Reply with ONLY numbered steps, one per line, no other text.'
-        },
-        { role: 'user', content: task }
-      ];
-      const result = await gen(messages, { max_new_tokens: 160, temperature: 0.4 });
-      const raw = result[0].generated_text.at(-1).content;
-      const steps = [];
-      for (const line of raw.split('\n')) {
-        const m = line.match(/^\d+[\.\)]\s*(.+)/);
-        if (m && m[1].trim()) steps.push(m[1].trim());
-      }
-      return steps.slice(0, 5);
-    }
+    // ── Review list ───────────────────────────────────────────────────────────
 
-    function renderQuadrants(tasks, assignments) {
-      const buckets = { 'easy-today': [], 'hard-today': [], 'easy-later': [], 'hard-later': [] };
-      tasks.forEach((t, i) => { buckets[assignments[i]].push(t); });
+    const QUADRANT_LABELS = {
+      'easy-today': 'easy · today',
+      'hard-today': 'hard · today',
+      'easy-later': 'easy · later',
+      'hard-later': 'hard · later',
+    };
+    const QUADRANTS = ['easy-today','hard-today','easy-later','hard-later'];
 
-      const SHOW = 3;
-      ['easy-today','hard-today','easy-later','hard-later'].forEach(cat => {
-        const ul = document.getElementById(`ql-${cat}`);
-        ul.innerHTML = '';
-        const isHard = cat.startsWith('hard');
-        buckets[cat].forEach((task, idx) => {
-          const li = document.createElement('li');
-          li.className = 'bd-task-item' + (idx >= SHOW ? ' bd-task-dim' : '') + (isHard ? ' bd-task-hard' : '');
-          li.dataset.task = task;
-          li.dataset.cat  = cat;
+    function renderReviewList() {
+      const ul = document.getElementById('bd-review-list');
+      ul.innerHTML = '';
+      bdExtracted.forEach((item, idx) => {
+        const li   = document.createElement('li');
+        li.className = 'bd-review-item';
 
-          const span = document.createElement('span');
-          span.textContent = task;
-          li.appendChild(span);
-
-          if (isHard) li.addEventListener('click', () => handleHardClick(li, task));
-          ul.appendChild(li);
+        const badge = document.createElement('button');
+        badge.className = 'bd-quadrant-badge';
+        badge.textContent = QUADRANT_LABELS[item.quadrant];
+        badge.dataset.quadrant = item.quadrant;
+        badge.addEventListener('click', () => {
+          const cur = QUADRANTS.indexOf(item.quadrant);
+          item.quadrant = QUADRANTS[(cur + 1) % QUADRANTS.length];
+          badge.textContent = QUADRANT_LABELS[item.quadrant];
+          badge.dataset.quadrant = item.quadrant;
         });
-        if (buckets[cat].length > SHOW) {
-          const more = document.createElement('li');
-          more.className = 'bd-task-more';
-          more.textContent = `${buckets[cat].length - SHOW} more — consider moving to later`;
-          ul.appendChild(more);
-        }
+
+        const span = document.createElement('span');
+        span.textContent = item.task;
+
+        const rm = document.createElement('button');
+        rm.className = 'bd-remove-btn';
+        rm.textContent = '×';
+        rm.addEventListener('click', () => {
+          bdExtracted.splice(idx, 1);
+          renderReviewList();
+        });
+
+        li.appendChild(badge);
+        li.appendChild(span);
+        li.appendChild(rm);
+        ul.appendChild(li);
       });
-
-      bdPhaseInput.classList.add('hidden');
-      bdPhaseResults.classList.remove('hidden');
-      braindumpStatus.textContent = '';
     }
 
-    async function handleHardClick(li, task) {
-      if (li.dataset.expanded === 'true' || li.dataset.expanding === 'true') return;
-      li.dataset.expanding = 'true';
-      const notice = document.createElement('p');
-      notice.className = 'bd-steps-loading';
-      notice.textContent = 'breaking down…';
-      li.appendChild(notice);
-
-      const gen = await loadBdModel();
-      if (!gen) { notice.textContent = 'something went wrong'; li.dataset.expanding = ''; return; }
-
-      try {
-        const steps = await breakdownTask(task, gen);
-        notice.remove();
-        const stepsUl = document.createElement('ul');
-        stepsUl.className = 'bd-mini-steps';
-        steps.forEach(s => { const sli = document.createElement('li'); sli.textContent = s; stepsUl.appendChild(sli); });
-        li.appendChild(stepsUl);
-        li.dataset.expanded = 'true';
-        li.dataset.steps    = JSON.stringify(steps);
-        li.dataset.expanding = '';
-      } catch (err) {
-        notice.textContent = 'something went wrong';
-        li.dataset.expanding = '';
-      }
-    }
+    // ── Sort button ───────────────────────────────────────────────────────────
 
     braindumpSortBtn.addEventListener('click', async () => {
       const raw = braindumpText.value.trim();
       if (!raw) return;
-      const tasks = parseDumpLines(raw);
-      if (!tasks.length) return;
 
+      stopRecording();
       braindumpSortBtn.disabled = true;
+
       const gen = await loadBdModel();
       if (!gen) {
         braindumpStatus.textContent = 'something went wrong — try refreshing';
         braindumpSortBtn.disabled = false;
         return;
       }
-      braindumpStatus.textContent = 'sorting…';
+
+      braindumpStatus.textContent = 'reading your thoughts…';
       try {
-        const assignments = await classifyTasks(tasks, gen);
-        renderQuadrants(tasks, assignments);
+        bdExtracted = await extractTasksFromBlob(raw, gen);
+        if (!bdExtracted.length) {
+          braindumpStatus.textContent = 'nothing found — try rephrasing';
+          braindumpSortBtn.disabled = false;
+          return;
+        }
+        renderReviewList();
+        bdPhaseInput.classList.add('hidden');
+        bdPhaseResults.classList.remove('hidden');
       } catch (err) {
         console.error('Sort error:', err);
         braindumpStatus.textContent = 'something went wrong';
@@ -907,52 +960,46 @@
       }
     });
 
-    async function pushTasksToDay(taskNames, dayStr) {
-      if (!userId) { showProfileOverlay(); return 0; }
-      const startPos = dayStr === todayStr ? list.querySelectorAll('.task-item').length : 0;
-      const inserts  = taskNames.map((name, i) => ({
-        user_id: userId, task_name: name, crossed_off: false,
-        day: dayStr, rolled_over: false, position: startPos + i
-      }));
-      const { data: inserted } = await sb.from('tasks').insert(inserts).select();
-      if (dayStr === todayStr && inserted?.length) {
-        inserted.forEach(t => list.appendChild(makeTask(t, 'today')));
-      }
-      return inserted?.length || 0;
-    }
+    // ── Back button ───────────────────────────────────────────────────────────
 
-    function collectItems(quadrants) {
-      const names = [];
-      quadrants.forEach(q => {
-        document.querySelectorAll(`#ql-${q} .bd-task-item`).forEach(li => {
-          if (li.dataset.expanded === 'true') {
-            names.push(...JSON.parse(li.dataset.steps || '[]'));
-          } else {
-            names.push(li.dataset.task);
-          }
-        });
-      });
-      return names;
-    }
-
-    document.getElementById('braindump-add-today-btn').addEventListener('click', async () => {
-      const btn   = document.getElementById('braindump-add-today-btn');
-      btn.disabled = true;
-      btn.textContent = 'adding…';
-      const names = collectItems(['easy-today','hard-today']);
-      if (!names.length) { btn.disabled = false; btn.textContent = 'add today tasks to list'; return; }
-      const n = await pushTasksToDay(names, todayStr);
-      btn.textContent = `✓ added ${n}`;
+    document.getElementById('bd-back-btn').addEventListener('click', () => {
+      bdPhaseResults.classList.add('hidden');
+      bdPhaseInput.classList.remove('hidden');
+      braindumpSortBtn.disabled = false;
+      braindumpStatus.textContent = '';
     });
 
-    document.getElementById('braindump-add-tomorrow-btn').addEventListener('click', async () => {
-      const btn   = document.getElementById('braindump-add-tomorrow-btn');
+    // ── Add all to board ──────────────────────────────────────────────────────
+
+    document.getElementById('bd-add-all-btn').addEventListener('click', async () => {
+      if (!bdExtracted.length) return;
+      if (!userId) { showProfileOverlay(); return; }
+
+      const btn = document.getElementById('bd-add-all-btn');
       btn.disabled = true;
-      btn.textContent = 'sending…';
-      const names = collectItems(['easy-later','hard-later']);
-      if (!names.length) { btn.disabled = false; btn.textContent = 'send later tasks to tomorrow'; return; }
-      const n = await pushTasksToDay(names, tomorrowStr);
-      btn.textContent = `✓ sent ${n}`;
+      btn.textContent = 'adding…';
+
+      const inserts = bdExtracted.map((item, i) => ({
+        user_id:    userId,
+        task_name:  item.task,
+        quadrant:   item.quadrant,
+        crossed_off: false,
+        day:        todayStr,
+        rolled_over: false,
+        position:   9999 + i
+      }));
+
+      const { data: inserted, error } = await sb.from('tasks').insert(inserts).select();
+      if (error) {
+        btn.disabled = false;
+        btn.textContent = 'add to board';
+        console.error('Insert error:', error);
+        braindumpStatus.textContent = 'error saving — is the quadrant column added?';
+        return;
+      }
+
+      if (inserted) inserted.forEach(t => addTaskToBoard(t));
+      closeBraindump();
     });
 
     init();
