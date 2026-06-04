@@ -54,7 +54,48 @@
 
     <ul id="task-list"></ul>
     <input type="text" id="task-input" autocomplete="off" spellcheck="false" />
+    <button id="braindump-link" class="braindump-link">brain dump</button>
   </main>
+
+  <!-- Brain dump overlay -->
+  <div id="braindump-overlay" class="braindump-overlay hidden">
+    <div class="paper">
+      <div class="braindump-header">
+        <button id="braindump-close" class="braindump-close">×</button>
+      </div>
+      <div id="braindump-phase-input">
+        <textarea id="braindump-text" placeholder="everything in your head. one thought per line." autocomplete="off" spellcheck="false"></textarea>
+        <div class="braindump-actions-row">
+          <button id="braindump-sort-btn">sort it</button>
+          <p id="braindump-status"></p>
+        </div>
+      </div>
+      <div id="braindump-phase-results" class="hidden">
+        <div class="quadrant-grid">
+          <div class="quadrant">
+            <p class="quadrant-label">easy · today</p>
+            <ul class="quadrant-list" id="ql-easy-today"></ul>
+          </div>
+          <div class="quadrant">
+            <p class="quadrant-label">hard · today</p>
+            <ul class="quadrant-list" id="ql-hard-today"></ul>
+          </div>
+          <div class="quadrant">
+            <p class="quadrant-label">easy · later</p>
+            <ul class="quadrant-list" id="ql-easy-later"></ul>
+          </div>
+          <div class="quadrant">
+            <p class="quadrant-label">hard · later</p>
+            <ul class="quadrant-list" id="ql-hard-later"></ul>
+          </div>
+        </div>
+        <div class="braindump-result-actions">
+          <button id="braindump-add-today-btn">add today tasks to list</button>
+          <button id="braindump-add-tomorrow-btn">send later tasks to tomorrow</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div id="task-menu" class="task-menu hidden">
     <button id="menu-edit">edit</button>
@@ -114,6 +155,7 @@
     // ── DOM refs ──────────────────────────────────────────────────────────────
 
     const input          = document.getElementById('task-input');
+    const braindumpLink  = document.getElementById('braindump-link');
     const list           = document.getElementById('task-list');
     const fold           = document.querySelector('.fold');
     const headerTitle    = document.querySelector('header h1');
@@ -341,6 +383,7 @@
       headerTitle.textContent = 'T O D A Y';
       dateEl.textContent = fmtDisplay(todayStr);
       input.style.display = '';
+      braindumpLink.style.display = '';
       list.innerHTML = '';
 
       const { data: tasks } = await sb.from('tasks')
@@ -366,6 +409,7 @@
       headerTitle.textContent = 'T O M O R R O W';
       dateEl.textContent = fmtDisplay(tomorrowStr);
       input.style.display = 'none';
+      braindumpLink.style.display = 'none';
       list.innerHTML = '';
 
       const { data: tasks } = await sb.from('tasks')
@@ -652,6 +696,264 @@
       });
       editInput.addEventListener('blur', saveEdit);
     }
+
+    // ── Brain Dump ────────────────────────────────────────────────────────────────
+
+    const BD_MODEL = 'onnx-community/Qwen2.5-0.5B-Instruct';
+    let bdGenerator = null;
+    let bdModelLoading = false;
+
+    const braindumpOverlay  = document.getElementById('braindump-overlay');
+    const braindumpClose    = document.getElementById('braindump-close');
+    const braindumpText     = document.getElementById('braindump-text');
+    const braindumpSortBtn  = document.getElementById('braindump-sort-btn');
+    const braindumpStatus   = document.getElementById('braindump-status');
+    const bdPhaseInput      = document.getElementById('braindump-phase-input');
+    const bdPhaseResults    = document.getElementById('braindump-phase-results');
+
+    function openBraindump() {
+      braindumpOverlay.classList.remove('hidden');
+      setTimeout(() => braindumpText.focus(), 50);
+    }
+
+    function closeBraindump() {
+      braindumpOverlay.classList.add('hidden');
+      braindumpText.value = '';
+      bdPhaseResults.classList.add('hidden');
+      bdPhaseInput.classList.remove('hidden');
+      braindumpStatus.textContent = '';
+      braindumpSortBtn.disabled = false;
+      ['easy-today','hard-today','easy-later','hard-later'].forEach(q => {
+        document.getElementById(`ql-${q}`).innerHTML = '';
+      });
+      const addToday = document.getElementById('braindump-add-today-btn');
+      const addTmrw  = document.getElementById('braindump-add-tomorrow-btn');
+      addToday.disabled = false; addToday.textContent = 'add today tasks to list';
+      addTmrw.disabled = false;  addTmrw.textContent  = 'send later tasks to tomorrow';
+    }
+
+    braindumpLink.addEventListener('click', openBraindump);
+    braindumpClose.addEventListener('click', closeBraindump);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !braindumpOverlay.classList.contains('hidden')) closeBraindump();
+    });
+
+    braindumpText.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        braindumpSortBtn.click();
+      }
+    });
+
+    async function loadBdModel() {
+      if (bdGenerator) return bdGenerator;
+      if (bdModelLoading) return null;
+      bdModelLoading = true;
+      braindumpStatus.textContent = 'loading model… (first time ~400mb, then cached)';
+      try {
+        const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/transformers.min.js');
+        env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/';
+        env.useBrowserCache = true;
+        bdGenerator = await pipeline('text-generation', BD_MODEL, {
+          dtype: 'q4',
+          progress_callback: info => {
+            if (info.status === 'downloading') {
+              const pct = info.total ? Math.round((info.loaded / info.total) * 100) : '…';
+              braindumpStatus.textContent = `downloading model… ${pct}%`;
+            } else if (info.status === 'loading') {
+              braindumpStatus.textContent = 'loading model…';
+            }
+          }
+        });
+        bdModelLoading = false;
+        return bdGenerator;
+      } catch (err) {
+        bdModelLoading = false;
+        console.error('Brain dump model error:', err);
+        return null;
+      }
+    }
+
+    function parseDumpLines(raw) {
+      return raw.split('\n').map(l => l.trim()).filter(l => l.length > 1 && l.length < 300);
+    }
+
+    async function classifyTasks(tasks, gen) {
+      const numberedList = tasks.map((t, i) => `${i + 1}. ${t}`).join('\n');
+      const messages = [
+        {
+          role: 'system',
+          content: 'You classify tasks into exactly one of: easy-today, hard-today, easy-later, hard-later.\n' +
+                   'easy = quick/low-effort. hard = needs focus or planning. today = urgent. later = can wait.\n' +
+                   'Reply with ONLY: 1:easy-today 2:hard-later 3:easy-today — no other text.'
+        },
+        { role: 'user', content: numberedList }
+      ];
+      const result = await gen(messages, { max_new_tokens: tasks.length * 12 + 20, temperature: 0.1, do_sample: false });
+      const reply = result[0].generated_text.at(-1).content.trim();
+
+      const valid = new Set(['easy-today','hard-today','easy-later','hard-later']);
+      const assignments = {};
+      for (const m of reply.matchAll(/(\d+)[:\-\s]+([a-z]+-[a-z]+)/g)) {
+        const idx = parseInt(m[1]) - 1;
+        const cat = m[2];
+        if (idx >= 0 && idx < tasks.length && valid.has(cat)) assignments[idx] = cat;
+      }
+      tasks.forEach((_, i) => { if (!assignments[i]) assignments[i] = 'easy-today'; });
+      return assignments;
+    }
+
+    async function breakdownTask(task, gen) {
+      const messages = [
+        {
+          role: 'system',
+          content: 'Break a task into 3 to 5 concrete, actionable mini steps. Reply with ONLY numbered steps, one per line, no other text.'
+        },
+        { role: 'user', content: task }
+      ];
+      const result = await gen(messages, { max_new_tokens: 160, temperature: 0.4 });
+      const raw = result[0].generated_text.at(-1).content;
+      const steps = [];
+      for (const line of raw.split('\n')) {
+        const m = line.match(/^\d+[\.\)]\s*(.+)/);
+        if (m && m[1].trim()) steps.push(m[1].trim());
+      }
+      return steps.slice(0, 5);
+    }
+
+    function renderQuadrants(tasks, assignments) {
+      const buckets = { 'easy-today': [], 'hard-today': [], 'easy-later': [], 'hard-later': [] };
+      tasks.forEach((t, i) => { buckets[assignments[i]].push(t); });
+
+      const SHOW = 3;
+      ['easy-today','hard-today','easy-later','hard-later'].forEach(cat => {
+        const ul = document.getElementById(`ql-${cat}`);
+        ul.innerHTML = '';
+        const isHard = cat.startsWith('hard');
+        buckets[cat].forEach((task, idx) => {
+          const li = document.createElement('li');
+          li.className = 'bd-task-item' + (idx >= SHOW ? ' bd-task-dim' : '') + (isHard ? ' bd-task-hard' : '');
+          li.dataset.task = task;
+          li.dataset.cat  = cat;
+
+          const span = document.createElement('span');
+          span.textContent = task;
+          li.appendChild(span);
+
+          if (isHard) li.addEventListener('click', () => handleHardClick(li, task));
+          ul.appendChild(li);
+        });
+        if (buckets[cat].length > SHOW) {
+          const more = document.createElement('li');
+          more.className = 'bd-task-more';
+          more.textContent = `${buckets[cat].length - SHOW} more — consider moving to later`;
+          ul.appendChild(more);
+        }
+      });
+
+      bdPhaseInput.classList.add('hidden');
+      bdPhaseResults.classList.remove('hidden');
+      braindumpStatus.textContent = '';
+    }
+
+    async function handleHardClick(li, task) {
+      if (li.dataset.expanded === 'true' || li.dataset.expanding === 'true') return;
+      li.dataset.expanding = 'true';
+      const notice = document.createElement('p');
+      notice.className = 'bd-steps-loading';
+      notice.textContent = 'breaking down…';
+      li.appendChild(notice);
+
+      const gen = await loadBdModel();
+      if (!gen) { notice.textContent = 'something went wrong'; li.dataset.expanding = ''; return; }
+
+      try {
+        const steps = await breakdownTask(task, gen);
+        notice.remove();
+        const stepsUl = document.createElement('ul');
+        stepsUl.className = 'bd-mini-steps';
+        steps.forEach(s => { const sli = document.createElement('li'); sli.textContent = s; stepsUl.appendChild(sli); });
+        li.appendChild(stepsUl);
+        li.dataset.expanded = 'true';
+        li.dataset.steps    = JSON.stringify(steps);
+        li.dataset.expanding = '';
+      } catch (err) {
+        notice.textContent = 'something went wrong';
+        li.dataset.expanding = '';
+      }
+    }
+
+    braindumpSortBtn.addEventListener('click', async () => {
+      const raw = braindumpText.value.trim();
+      if (!raw) return;
+      const tasks = parseDumpLines(raw);
+      if (!tasks.length) return;
+
+      braindumpSortBtn.disabled = true;
+      const gen = await loadBdModel();
+      if (!gen) {
+        braindumpStatus.textContent = 'something went wrong — try refreshing';
+        braindumpSortBtn.disabled = false;
+        return;
+      }
+      braindumpStatus.textContent = 'sorting…';
+      try {
+        const assignments = await classifyTasks(tasks, gen);
+        renderQuadrants(tasks, assignments);
+      } catch (err) {
+        console.error('Sort error:', err);
+        braindumpStatus.textContent = 'something went wrong';
+        braindumpSortBtn.disabled = false;
+      }
+    });
+
+    async function pushTasksToDay(taskNames, dayStr) {
+      if (!userId) { showProfileOverlay(); return 0; }
+      const startPos = dayStr === todayStr ? list.querySelectorAll('.task-item').length : 0;
+      const inserts  = taskNames.map((name, i) => ({
+        user_id: userId, task_name: name, crossed_off: false,
+        day: dayStr, rolled_over: false, position: startPos + i
+      }));
+      const { data: inserted } = await sb.from('tasks').insert(inserts).select();
+      if (dayStr === todayStr && inserted?.length) {
+        inserted.forEach(t => list.appendChild(makeTask(t, 'today')));
+      }
+      return inserted?.length || 0;
+    }
+
+    function collectItems(quadrants) {
+      const names = [];
+      quadrants.forEach(q => {
+        document.querySelectorAll(`#ql-${q} .bd-task-item`).forEach(li => {
+          if (li.dataset.expanded === 'true') {
+            names.push(...JSON.parse(li.dataset.steps || '[]'));
+          } else {
+            names.push(li.dataset.task);
+          }
+        });
+      });
+      return names;
+    }
+
+    document.getElementById('braindump-add-today-btn').addEventListener('click', async () => {
+      const btn   = document.getElementById('braindump-add-today-btn');
+      btn.disabled = true;
+      btn.textContent = 'adding…';
+      const names = collectItems(['easy-today','hard-today']);
+      if (!names.length) { btn.disabled = false; btn.textContent = 'add today tasks to list'; return; }
+      const n = await pushTasksToDay(names, todayStr);
+      btn.textContent = `✓ added ${n}`;
+    });
+
+    document.getElementById('braindump-add-tomorrow-btn').addEventListener('click', async () => {
+      const btn   = document.getElementById('braindump-add-tomorrow-btn');
+      btn.disabled = true;
+      btn.textContent = 'sending…';
+      const names = collectItems(['easy-later','hard-later']);
+      if (!names.length) { btn.disabled = false; btn.textContent = 'send later tasks to tomorrow'; return; }
+      const n = await pushTasksToDay(names, tomorrowStr);
+      btn.textContent = `✓ sent ${n}`;
+    });
 
     init();
   </script>
