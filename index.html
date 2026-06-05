@@ -175,6 +175,19 @@
      *   FOR ALL USING (auth.uid() = user_id);
      */
 
+    function getPendingCrossed() {
+      try { return new Set(JSON.parse(localStorage.getItem('today-list-crossed') || '[]')); }
+      catch { return new Set(); }
+    }
+    function addPendingCrossed(id) {
+      const s = getPendingCrossed(); s.add(id);
+      localStorage.setItem('today-list-crossed', JSON.stringify([...s]));
+    }
+    function removePendingCrossed(id) {
+      const s = getPendingCrossed(); s.delete(id);
+      localStorage.setItem('today-list-crossed', JSON.stringify([...s]));
+    }
+
     const SUPABASE_URL = 'https://azitxesbwldyqfpqylby.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_LishKGyfBaBZHyzs4uJ23Q_8rxWCq3a';
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -454,7 +467,8 @@
         .order('position', { ascending: true })
         .order('created_at', { ascending: true });
 
-      const loaded = tasks || [];
+      const crossedCache = getPendingCrossed();
+      const loaded = (tasks || []).filter(t => !crossedCache.has(t.id));
 
       // One-time fix: first migration incorrectly set uncrossed tasks to easy-later
       if (!localStorage.getItem('q-fix-1')) {
@@ -563,8 +577,15 @@
       const isHard = (task.quadrant || '').startsWith('hard');
       li.classList.add('crossed');
       drawStrike(li, span, true);
-      sb.from('tasks').update({ crossed_off: true }).eq('id', task.id);
+
+      // Write to localStorage immediately — survives Safari killing the page mid-fetch
+      addPendingCrossed(task.id);
+
+      sb.from('tasks').update({ crossed_off: true }).eq('id', task.id)
+        .then(() => removePendingCrossed(task.id))
+        .catch(() => {});
       sb.from('tasks').update({ completed_at: new Date().toISOString() }).eq('id', task.id).catch(() => {});
+
       setTimeout(() => fadeOut(li, () => li.remove()), 500);
       waterPlant(isHard);
     }
