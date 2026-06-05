@@ -223,6 +223,22 @@ header p {
   margin-bottom: 0.55rem;
 }
 
+.ql-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: block;
+  transition: opacity 0.1s;
+}
+
+.ql-btn:hover { opacity: 0.65; }
+
+.ql-btn.active-ql {
+  opacity: 0.75;
+  border-bottom: 1px solid rgba(30, 69, 29, 0.4);
+}
+
 .board-list {
   list-style: none;
   min-height: 1.2rem;
@@ -594,4 +610,121 @@ header p {
   color: #1e451d;
   opacity: 0.35;
   padding: 0.2rem 0;
+}
+
+/* ── History ── */
+
+#history-list {
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+.history-date {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.63rem;
+  color: #1e451d;
+  opacity: 0.38;
+  letter-spacing: 0.06em;
+  margin-top: 1.25rem;
+  margin-bottom: 0.4rem;
+}
+
+.history-date:first-child { margin-top: 0; }
+
+.history-item {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.82rem;
+  color: #1e451d;
+  opacity: 0.45;
+  padding: 0.18rem 0;
+  text-decoration: line-through;
+  text-decoration-color: rgba(30, 69, 29, 0.3);
+}
+
+.history-empty {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.76rem;
+  color: #1e451d;
+  opacity: 0.3;
+}
+
+/* ── Plant system ── */
+
+.plant-area {
+  display: flex;
+  justify-content: center;
+  margin: 2.5rem 0 1.5rem;
+}
+
+.plant-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.plant-growth {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  min-height: 10px;
+}
+
+.plant-wrap.pulsing {
+  animation: pot-pulse 0.42s ease;
+}
+
+.plant-growth.growing {
+  animation: plant-grow 0.55s ease;
+}
+
+.seeds-badge {
+  position: absolute;
+  top: -2px;
+  right: -18px;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.58rem;
+  color: #1e451d;
+  opacity: 0.45;
+  white-space: nowrap;
+}
+
+.plant-droplet {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.9rem;
+  color: #1e451d;
+  opacity: 0;
+  pointer-events: none;
+  animation: float-up 0.65s ease forwards;
+}
+
+.plant-seed-float {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.58rem;
+  color: #1e451d;
+  opacity: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: float-up 0.9s ease forwards;
+}
+
+@keyframes pot-pulse {
+  0%, 100% { transform: scale(1); }
+  35%       { transform: scale(1.11); }
+}
+
+@keyframes plant-grow {
+  0%   { opacity: 0.2; transform: scaleY(0.75); transform-origin: bottom center; }
+  100% { opacity: 1;   transform: scaleY(1);    transform-origin: bottom center; }
+}
+
+@keyframes float-up {
+  0%   { opacity: 0.65; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0;    transform: translateX(-50%) translateY(-30px); }
 }

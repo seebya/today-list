@@ -35,6 +35,10 @@
           <button id="auth-signout-btn">sign out</button>
         </div>
       </section>
+      <section class="profile-section">
+        <p class="section-label">completed</p>
+        <div id="history-list"></div>
+      </section>
     </div>
   </div>
 
@@ -61,11 +65,11 @@
     <div class="board-section">
       <div class="board-row">
         <div>
-          <p class="quadrant-label">easy · today</p>
+          <button class="quadrant-label ql-btn active-ql" data-q="easy-today">easy · today</button>
           <ul class="board-list" id="bl-easy-today"></ul>
         </div>
         <div>
-          <p class="quadrant-label">hard · today</p>
+          <button class="quadrant-label ql-btn" data-q="hard-today">hard · today</button>
           <ul class="board-list" id="bl-hard-today"></ul>
         </div>
       </div>
@@ -74,13 +78,26 @@
 
       <div class="board-row board-later">
         <div>
-          <p class="quadrant-label">easy · later</p>
+          <button class="quadrant-label ql-btn" data-q="easy-later">easy · later</button>
           <ul class="board-list" id="bl-easy-later"></ul>
         </div>
         <div>
-          <p class="quadrant-label">hard · later</p>
+          <button class="quadrant-label ql-btn" data-q="hard-later">hard · later</button>
           <ul class="board-list" id="bl-hard-later"></ul>
         </div>
+      </div>
+    </div>
+
+    <!-- Plant pot -->
+    <div class="plant-area">
+      <div class="plant-wrap" id="plant-wrap">
+        <div class="plant-growth" id="plant-growth"></div>
+        <svg class="pot-svg" viewBox="0 0 44 22" width="44" height="22">
+          <rect x="2" y="0" width="40" height="5" rx="2" stroke="#1e451d" stroke-width="1.2" fill="none"/>
+          <path d="M6 5 L2 22 L42 22 L38 5" stroke="#1e451d" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
+          <path d="M7 9 Q22 12 37 9" stroke="#1e451d" stroke-width="0.8" stroke-opacity="0.35" fill="none"/>
+        </svg>
+        <div class="seeds-badge hidden" id="seeds-badge"></div>
       </div>
     </div>
 
@@ -139,8 +156,23 @@
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script>
     /*
-     * MIGRATION — run once in Supabase SQL editor:
+     * MIGRATIONS — run once in Supabase SQL editor:
      * ALTER TABLE tasks ADD COLUMN IF NOT EXISTS quadrant TEXT;
+     * ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+     *
+     * CREATE TABLE IF NOT EXISTS plants (
+     *   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+     *   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+     *   species TEXT NOT NULL DEFAULT 'fern',
+     *   stage INTEGER NOT NULL DEFAULT 0,
+     *   water_count INTEGER NOT NULL DEFAULT 0,
+     *   seeds_pending INTEGER NOT NULL DEFAULT 0,
+     *   created_at TIMESTAMPTZ DEFAULT NOW(),
+     *   is_collected BOOLEAN NOT NULL DEFAULT FALSE
+     * );
+     * ALTER TABLE plants ENABLE ROW LEVEL SECURITY;
+     * CREATE POLICY "user owns plants" ON plants
+     *   FOR ALL USING (auth.uid() = user_id);
      */
 
     const SUPABASE_URL = 'https://azitxesbwldyqfpqylby.supabase.co';
@@ -193,6 +225,38 @@
     let currentUserEmail = null;
     let currentIconIndex = 0;
     let authInitialized  = false;
+    let activeQuadrant   = 'easy-today';
+
+    // ── Plant state ───────────────────────────────────────────────────────────
+    let plantData = null;
+    const PLANT_SPECIES = ['fern', 'succulent', 'grass'];
+    const WATERS_PER_STAGE = 3;
+
+    const PLANT_SVGS = {
+      fern: [
+        `<svg viewBox="0 0 40 10" width="40" height="10"><ellipse cx="20" cy="6" rx="5" ry="3.5" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+        `<svg viewBox="0 0 40 24" width="40" height="24"><path d="M20 24 L20 10" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 13 Q26 9 28 13" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+        `<svg viewBox="0 0 40 36" width="40" height="36"><path d="M20 36 L20 4" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 10 Q28 5 27 12" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 10 Q12 5 13 12" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 20 Q28 16 27 22" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 20 Q12 16 13 22" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+        `<svg viewBox="0 0 40 48" width="40" height="48"><path d="M20 48 L20 2" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 8 Q29 3 28 10" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 8 Q11 3 12 10" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 18 Q29 13 28 20" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 18 Q11 13 12 20" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 28 Q28 24 27 30" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 28 Q12 24 13 30" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+      ],
+      succulent: [
+        `<svg viewBox="0 0 40 10" width="40" height="10"><ellipse cx="20" cy="6" rx="5" ry="3.5" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+        `<svg viewBox="0 0 40 24" width="40" height="24"><path d="M20 24 L20 14" stroke="#1e451d" stroke-width="1.2" fill="none"/><ellipse cx="20" cy="10" rx="5.5" ry="4" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+        `<svg viewBox="0 0 40 32" width="40" height="32"><path d="M20 32 L20 18" stroke="#1e451d" stroke-width="1.2" fill="none"/><ellipse cx="20" cy="12" rx="5" ry="4" stroke="#1e451d" stroke-width="1.2" fill="none"/><ellipse cx="11" cy="19" rx="4.5" ry="3.5" stroke="#1e451d" stroke-width="1.2" fill="none"/><ellipse cx="29" cy="19" rx="4.5" ry="3.5" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+        `<svg viewBox="0 0 40 44" width="40" height="44"><path d="M20 44 L20 28" stroke="#1e451d" stroke-width="1.2" fill="none"/><ellipse cx="20" cy="20" rx="5" ry="4" stroke="#1e451d" stroke-width="1.2" fill="none"/><ellipse cx="11" cy="27" rx="4.5" ry="3.5" stroke="#1e451d" stroke-width="1.2" fill="none"/><ellipse cx="29" cy="27" rx="4.5" ry="3.5" stroke="#1e451d" stroke-width="1.2" fill="none"/><ellipse cx="13" cy="14" rx="3.5" ry="3" stroke="#1e451d" stroke-width="1.2" fill="none"/><ellipse cx="27" cy="14" rx="3.5" ry="3" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+      ],
+      grass: [
+        `<svg viewBox="0 0 40 10" width="40" height="10"><ellipse cx="20" cy="6" rx="5" ry="3.5" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+        `<svg viewBox="0 0 40 32" width="40" height="32"><path d="M20 32 Q17 18 18 4" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+        `<svg viewBox="0 0 40 40" width="40" height="40"><path d="M16 40 Q12 24 12 6" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 40 Q20 22 20 4" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M24 40 Q28 24 28 6" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+        `<svg viewBox="0 0 40 52" width="40" height="52"><path d="M16 52 Q12 34 12 14" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M20 52 Q20 32 20 10" stroke="#1e451d" stroke-width="1.2" fill="none"/><path d="M24 52 Q28 34 28 14" stroke="#1e451d" stroke-width="1.2" fill="none"/><circle cx="12" cy="11" r="3.5" stroke="#1e451d" stroke-width="1.2" fill="none"/><circle cx="20" cy="7" r="4" stroke="#1e451d" stroke-width="1.2" fill="none"/><circle cx="28" cy="11" r="3.5" stroke="#1e451d" stroke-width="1.2" fill="none"/></svg>`,
+      ],
+    };
+
+    function plantSVG(species, stage) {
+      const s = PLANT_SVGS[species] || PLANT_SVGS.fern;
+      return s[Math.min(stage, 3)] || s[0];
+    }
 
     // ── Icon UI ───────────────────────────────────────────────────────────────
 
@@ -236,6 +300,7 @@
       profileOverlay.classList.remove('hidden');
       profileClose.classList.remove('hidden');
       buildIconGrid();
+      loadHistory();
     }
 
     function hideProfileOverlay() {
@@ -363,6 +428,7 @@
       }
 
       await renderBoard();
+      await loadPlant();
       authInitialized = true;
     }
 
@@ -384,7 +450,7 @@
       const { data: tasks } = await sb.from('tasks')
         .select('*')
         .eq('user_id', userId)
-        .or(`crossed_off.eq.false,day.eq.${todayStr}`)
+        .eq('crossed_off', false)
         .order('position', { ascending: true })
         .order('created_at', { ascending: true });
 
@@ -492,19 +558,15 @@
     }
 
     function crossOff(li, task) {
+      if (li.classList.contains('crossed')) return;
       const span = li.querySelector('span');
-      const nowCrossed = !li.classList.contains('crossed');
-      sb.from('tasks').update({ crossed_off: nowCrossed }).eq('id', task.id);
-
-      if (!nowCrossed) {
-        li.classList.remove('crossed');
-        const svg = li.querySelector('svg');
-        if (svg) svg.remove();
-        return;
-      }
-
+      const isHard = (task.quadrant || '').startsWith('hard');
       li.classList.add('crossed');
       drawStrike(li, span, true);
+      sb.from('tasks').update({ crossed_off: true }).eq('id', task.id);
+      sb.from('tasks').update({ completed_at: new Date().toISOString() }).eq('id', task.id).catch(() => {});
+      setTimeout(() => fadeOut(li, () => li.remove()), 500);
+      waterPlant(isHard);
     }
 
     function fadeOut(li, cb) {
@@ -565,6 +627,28 @@
 
     // ── Quick add ─────────────────────────────────────────────────────────────
 
+    const QUADRANT_PLACEHOLDER = {
+      'easy-today': 'quick add → easy today',
+      'hard-today': 'quick add → hard today',
+      'easy-later': 'quick add → easy later',
+      'hard-later': 'quick add → hard later',
+    };
+
+    function setActiveQuadrant(q) {
+      activeQuadrant = q;
+      taskInput.placeholder = QUADRANT_PLACEHOLDER[q];
+      document.querySelectorAll('.ql-btn').forEach(btn => {
+        btn.classList.toggle('active-ql', btn.dataset.q === q);
+      });
+    }
+
+    document.querySelectorAll('.ql-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setActiveQuadrant(btn.dataset.q);
+        taskInput.focus();
+      });
+    });
+
     taskInput.addEventListener('keydown', async function(e) {
       if (e.key !== 'Enter') return;
       const text = taskInput.value.trim();
@@ -573,12 +657,12 @@
 
       taskInput.value = '';
 
-      const ul = document.getElementById('bl-easy-today');
+      const ul = document.getElementById(`bl-${activeQuadrant}`);
       const { data: inserted, error } = await sb.from('tasks')
         .insert({
           user_id: userId, task_name: text, crossed_off: false,
           day: todayStr, rolled_over: false,
-          quadrant: 'easy-today',
+          quadrant: activeQuadrant,
           position: ul.querySelectorAll('.task-item').length
         })
         .select().single();
@@ -968,6 +1052,149 @@
       if (inserted) inserted.forEach(t => addTaskToBoard(t));
       closeBraindump();
     });
+
+    // ── Plant system ─────────────────────────────────────────────────────────
+
+    function renderPlant() {
+      const growth = document.getElementById('plant-growth');
+      const badge  = document.getElementById('seeds-badge');
+      if (!growth) return;
+
+      if (!plantData) {
+        growth.innerHTML = '';
+        badge.classList.add('hidden');
+        return;
+      }
+
+      growth.innerHTML = plantSVG(plantData.species, plantData.stage);
+
+      if (plantData.seeds_pending > 0) {
+        badge.textContent = `+${plantData.seeds_pending}`;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    function animatePot(isHard, didGrow) {
+      const wrap = document.getElementById('plant-wrap');
+      if (!wrap) return;
+
+      wrap.classList.add('pulsing');
+      setTimeout(() => wrap.classList.remove('pulsing'), 420);
+
+      const drop = document.createElement('div');
+      drop.className = 'plant-droplet';
+      drop.textContent = '·';
+      wrap.appendChild(drop);
+      setTimeout(() => drop.remove(), 650);
+
+      if (isHard) {
+        const float = document.createElement('div');
+        float.className = 'plant-seed-float';
+        float.textContent = '+seed';
+        wrap.appendChild(float);
+        setTimeout(() => float.remove(), 900);
+      }
+
+      if (didGrow) {
+        const growth = document.getElementById('plant-growth');
+        if (growth) {
+          growth.classList.add('growing');
+          setTimeout(() => growth.classList.remove('growing'), 550);
+        }
+      }
+    }
+
+    async function waterPlant(isHard) {
+      if (!plantData || !userId) return;
+
+      const newWater   = plantData.water_count + 1;
+      const newStage   = Math.min(3, Math.floor(newWater / WATERS_PER_STAGE));
+      const didGrow    = newStage > plantData.stage;
+      const newSeeds   = plantData.seeds_pending + (isHard ? 1 : 0);
+
+      plantData.water_count   = newWater;
+      plantData.stage         = newStage;
+      plantData.seeds_pending = newSeeds;
+
+      animatePot(isHard, didGrow);
+      renderPlant();
+
+      try {
+        await sb.from('plants')
+          .update({ water_count: newWater, stage: newStage, seeds_pending: newSeeds })
+          .eq('id', plantData.id);
+      } catch (e) {}
+    }
+
+    async function loadPlant() {
+      if (!userId) return;
+      try {
+        const { data } = await sb.from('plants')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('is_collected', false)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          plantData = data;
+        } else {
+          const species = PLANT_SPECIES[Math.floor(Math.random() * PLANT_SPECIES.length)];
+          const { data: newPlant } = await sb.from('plants')
+            .insert({ user_id: userId, species, stage: 0, water_count: 0, seeds_pending: 0, is_collected: false })
+            .select().single();
+          if (newPlant) plantData = newPlant;
+        }
+        renderPlant();
+      } catch (e) {
+        console.warn('plants table not found — run the SQL migration');
+      }
+    }
+
+    // ── History ───────────────────────────────────────────────────────────────
+
+    async function loadHistory() {
+      const historyList = document.getElementById('history-list');
+      if (!userId) { historyList.innerHTML = ''; return; }
+      historyList.innerHTML = '<p class="history-empty">loading…</p>';
+
+      const { data: tasks } = await sb.from('tasks')
+        .select('task_name, day, completed_at')
+        .eq('user_id', userId)
+        .eq('crossed_off', true)
+        .order('completed_at', { ascending: false, nullsFirst: false })
+        .order('day', { ascending: false })
+        .limit(200);
+
+      if (!tasks?.length) {
+        historyList.innerHTML = '<p class="history-empty">nothing yet</p>';
+        return;
+      }
+
+      const groups = {};
+      tasks.forEach(t => {
+        const date = t.completed_at ? t.completed_at.slice(0, 10) : (t.day || 'unknown');
+        if (!groups[date]) groups[date] = [];
+        groups[date].push(t.task_name);
+      });
+
+      historyList.innerHTML = '';
+      Object.entries(groups).sort(([a], [b]) => b.localeCompare(a)).forEach(([date, names]) => {
+        const dateEl = document.createElement('p');
+        dateEl.className = 'history-date';
+        dateEl.textContent = fmtDisplay(date);
+        historyList.appendChild(dateEl);
+        names.forEach(name => {
+          const item = document.createElement('p');
+          item.className = 'history-item';
+          item.textContent = name;
+          historyList.appendChild(item);
+        });
+      });
+    }
 
     init();
   </script>
