@@ -47,8 +47,6 @@
   <main class="paper">
     <header>
       <h1>T O D A Y</h1>
-      <p id="date"></p>
-      <p class="tagline">dump your brain. we'll sort it. then do one thing at a time.</p>
     </header>
 
     <!-- Brain dump entry -->
@@ -243,7 +241,6 @@
     const pad = n => String(n).padStart(2, '0');
     const todayStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
     function fmtDisplay(s) { return s.replace(/-/g, ' '); }
-    document.getElementById('date').textContent = fmtDisplay(todayStr);
 
     // ── Icons ─────────────────────────────────────────────────────────────────
 
@@ -293,43 +290,126 @@
     const WATERS_PER_STAGE = 2;
     const MAX_STAGE = 4;
 
-    function potSVG() {
-      return `<svg class="pot-svg" viewBox="0 0 44 22" width="44" height="22">
-        <ellipse cx="22" cy="2.5" rx="17" ry="2" fill="currentColor" fill-opacity="0.18" stroke="none"/>
-        <rect x="2" y="0" width="40" height="5" rx="2" stroke="currentColor" stroke-width="1.2" fill="none"/>
-        <path d="M6 5 L2 22 L42 22 L38 5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
-        <path d="M7 9 Q22 12 37 9" stroke="currentColor" stroke-width="0.8" stroke-opacity="0.35" fill="none"/>
-      </svg>`;
+    // Pixel-art rendering: grids of characters → SVG squares
+    function pixSVG(rows, colors, scale = 5) {
+      const h = rows.length;
+      const w = Math.max(...rows.map(r => r.length));
+      let rects = '';
+      rows.forEach((row, y) => {
+        [...row].forEach((ch, x) => {
+          const c = colors[ch];
+          if (c) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`;
+        });
+      });
+      return `<svg viewBox="0 0 ${w} ${h}" width="${w * scale}" height="${h * scale}" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+    }
+
+    const PLANT_COLORS = {
+      g: '#3e8e41',  // green
+      l: '#79c879',  // light green
+      y: '#f4c542',  // yellow
+      o: '#e8842c',  // orange
+      w: '#fdf6ec',  // white petal
+    };
+
+    const POT_STYLES = {
+      fern:      { p: '#bf6a3a', P: '#8f4a22', s: '#4a332a' },  // terracotta
+      succulent: { p: '#e3d4b6', P: '#bfa888', s: '#4a332a' },  // cream
+      grass:     { p: '#9c6b53', P: '#74462f', s: '#4a332a' },  // brown
+    };
+
+    const POT_ROWS = [
+      '...ssssssss...',
+      '..pppppppppp..',
+      '..pppppppppp..',
+      '...pppppppp...',
+      '...pppppppp...',
+      '...pppppppp...',
+      '....pppppp....',
+      '....PPPPPP....',
+    ];
+
+    function potSVG(species) {
+      return pixSVG(POT_ROWS, POT_STYLES[species] || POT_STYLES.fern);
     }
 
     // stage 0 = empty pot with soil (no foliage); stages 1–4 = growth
-    const PLANT_SVGS = {
+    const PLANT_PIX = {
       fern: [
-        '',
-        `<svg viewBox="0 0 40 10" width="40" height="10"><ellipse cx="20" cy="6" rx="5" ry="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-        `<svg viewBox="0 0 40 24" width="40" height="24"><path d="M20 24 L20 10" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 13 Q26 9 28 13" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-        `<svg viewBox="0 0 40 36" width="40" height="36"><path d="M20 36 L20 4" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 10 Q28 5 27 12" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 10 Q12 5 13 12" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 20 Q28 16 27 22" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 20 Q12 16 13 22" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-        `<svg viewBox="0 0 40 48" width="40" height="48"><path d="M20 48 L20 2" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 8 Q29 3 28 10" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 8 Q11 3 12 10" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 18 Q29 13 28 20" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 18 Q11 13 12 20" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 28 Q28 24 27 30" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 28 Q12 24 13 30" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
+        null,
+        [ '......gg......',
+          '......gg......' ],
+        [ '....l....l....',
+          '.....g..g.....',
+          '......gg......',
+          '......gg......' ],
+        [ '..l........l..',
+          '...g......g...',
+          '....g.ll.g....',
+          '.....gggg.....',
+          '......gg......',
+          '......gg......' ],
+        [ '.l...l..l...l.',
+          '..g...gg...g..',
+          '..g...gg...g..',
+          '...g..gg..g...',
+          '....g.gg.g....',
+          '.....gggg.....',
+          '......gg......',
+          '......gg......' ],
       ],
       succulent: [
-        '',
-        `<svg viewBox="0 0 40 10" width="40" height="10"><ellipse cx="20" cy="6" rx="5" ry="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-        `<svg viewBox="0 0 40 24" width="40" height="24"><path d="M20 24 L20 14" stroke="currentColor" stroke-width="1.2" fill="none"/><ellipse cx="20" cy="10" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-        `<svg viewBox="0 0 40 32" width="40" height="32"><path d="M20 32 L20 18" stroke="currentColor" stroke-width="1.2" fill="none"/><ellipse cx="20" cy="12" rx="5" ry="4" stroke="currentColor" stroke-width="1.2" fill="none"/><ellipse cx="11" cy="19" rx="4.5" ry="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/><ellipse cx="29" cy="19" rx="4.5" ry="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-        `<svg viewBox="0 0 40 44" width="40" height="44"><path d="M20 44 L20 28" stroke="currentColor" stroke-width="1.2" fill="none"/><ellipse cx="20" cy="20" rx="5" ry="4" stroke="currentColor" stroke-width="1.2" fill="none"/><ellipse cx="11" cy="27" rx="4.5" ry="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/><ellipse cx="29" cy="27" rx="4.5" ry="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/><ellipse cx="13" cy="14" rx="3.5" ry="3" stroke="currentColor" stroke-width="1.2" fill="none"/><ellipse cx="27" cy="14" rx="3.5" ry="3" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
+        null,
+        [ '.....gggg.....',
+          '.....glgg.....' ],
+        [ '.....gggg.....',
+          '.....glgg.....',
+          '.....glgg.....',
+          '.....gggg.....' ],
+        [ '.....gggg.....',
+          '.....glgg.....',
+          '.gg..glgg..gg.',
+          '.gg..glgg..gg.',
+          '.gggggggggggg.',
+          '.....gggg.....' ],
+        [ '......yy......',
+          '.....yooy.....',
+          '.....gggg.....',
+          '.....glgg.....',
+          '.gg..glgg..gg.',
+          '.gg..glgg..gg.',
+          '.gggggggggggg.',
+          '.....gggg.....' ],
       ],
       grass: [
-        '',
-        `<svg viewBox="0 0 40 10" width="40" height="10"><ellipse cx="20" cy="6" rx="5" ry="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-        `<svg viewBox="0 0 40 32" width="40" height="32"><path d="M20 32 Q17 18 18 4" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-        `<svg viewBox="0 0 40 40" width="40" height="40"><path d="M16 40 Q12 24 12 6" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 40 Q20 22 20 4" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M24 40 Q28 24 28 6" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-        `<svg viewBox="0 0 40 52" width="40" height="52"><path d="M16 52 Q12 34 12 14" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M20 52 Q20 32 20 10" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M24 52 Q28 34 28 14" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="12" cy="11" r="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="20" cy="7" r="4" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="28" cy="11" r="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
+        null,
+        [ '......ll......',
+          '......gg......' ],
+        [ '......gg......',
+          '...g..gg..g...',
+          '....g.gg.g....',
+          '......gg......' ],
+        [ '......oo......',
+          '......gg......',
+          '...g..gg..g...',
+          '....g.gg.g....',
+          '......gg......',
+          '......gg......' ],
+        [ '.....wwww.....',
+          '....wyyyyw....',
+          '....wyyyyw....',
+          '.....wwww.....',
+          '......gg......',
+          '...g..gg..g...',
+          '....g.gg.g....',
+          '......gg......' ],
       ],
     };
 
     function plantSVG(species, stage) {
-      const s = PLANT_SVGS[species] || PLANT_SVGS.fern;
-      return s[Math.min(stage, MAX_STAGE)] || '';
+      const s = PLANT_PIX[species] || PLANT_PIX.fern;
+      const rows = s[Math.min(stage, MAX_STAGE)];
+      return rows ? pixSVG(rows, PLANT_COLORS) : '';
     }
 
     // ── Icon UI ───────────────────────────────────────────────────────────────
@@ -1308,7 +1388,7 @@
         const wrap = document.createElement('div');
         wrap.className = 'plant-wrap';
         wrap.dataset.plantId = p.id;
-        wrap.innerHTML = `<div class="plant-growth">${plantSVG(p.species, p.stage)}</div>${potSVG()}`;
+        wrap.innerHTML = `<div class="plant-growth">${plantSVG(p.species, p.stage)}</div>${potSVG(p.species)}`;
         area.appendChild(wrap);
       });
     }

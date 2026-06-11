@@ -46,25 +46,9 @@ header {
 header h1 {
   font-family: var(--font);
   font-size: 1.75rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   line-height: 1;
-}
-
-header p {
-  font-family: var(--font);
-  font-size: 0.8rem;
-  font-weight: 400;
-  color: var(--ink);
-  margin-top: 0.5rem;
-  opacity: 0.7;
-}
-
-.tagline {
-  font-size: 0.78rem;
-  opacity: 0.55;
-  max-width: 360px;
-  line-height: 1.5;
 }
 
 .hidden { display: none !important; }
@@ -260,8 +244,8 @@ header p {
 .grid-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
+  gap: 1.5rem;
+  margin-top: 3rem;
 }
 
 .accept-day-btn {
@@ -280,17 +264,18 @@ header p {
 
 .back-to-focus-btn {
   background: none;
-  border: 1px solid rgba(var(--ink-rgb), 0.25);
-  border-radius: 999px;
+  border: none;
   font-family: var(--font);
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: 0.75rem;
   color: var(--ink);
-  padding: 0.55rem 1.2rem;
+  opacity: 0.4;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
+  padding: 0;
 }
 
-.back-to-focus-btn:hover { background: rgba(var(--ink-rgb), 0.05); }
+.back-to-focus-btn:hover { opacity: 0.75; }
 
 /* ── Focus mode ── */
 
@@ -896,7 +881,11 @@ header p {
   justify-content: center;
   align-items: flex-end;
   min-height: 10px;
+  line-height: 0;
+  margin-bottom: -5px;  /* stems sit in the soil row of the pot */
 }
+
+.plant-wrap > svg { display: block; }
 
 .plant-wrap.pulsing {
   animation: pot-pulse 0.42s ease;
@@ -912,7 +901,7 @@ header p {
 
 .plant-droplet {
   position: absolute;
-  bottom: 22px;
+  bottom: 40px;
   left: 50%;
   font-family: var(--font);
   font-size: 0.9rem;
@@ -924,7 +913,7 @@ header p {
 
 .plant-seed-float {
   position: absolute;
-  bottom: 28px;
+  bottom: 46px;
   left: 50%;
   font-family: var(--font);
   font-size: 0.58rem;
