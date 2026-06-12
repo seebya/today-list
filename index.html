@@ -689,11 +689,16 @@
     }
 
     const FOCUS_HEADINGS = {
-      'easy-today': ['easy · today', 'start easy'],
-      'hard-today': ['hard · today', 'now the bigger stuff'],
+      'easy-today': ['EASY TODAY', 'start easy and gain dopamine'],
+      'hard-today': ['HARD TODAY', 'now the bigger stuff'],
     };
 
     let lastFocusStage = null;
+
+    // After the flash animation, collapse the heading's space
+    document.getElementById('focus-heading').addEventListener('animationend', e => {
+      if (e.animationName === 'stage-flash') e.target.classList.add('flash-done');
+    });
 
     function renderFocus(stage) {
       const [label, heading] = FOCUS_HEADINGS[stage];
@@ -701,9 +706,9 @@
       const h = document.getElementById('focus-heading');
       h.textContent = heading;
       if (stage !== lastFocusStage) {
-        h.classList.remove('stage-swap');
+        h.classList.remove('stage-flash', 'flash-done');
         void h.offsetWidth;
-        h.classList.add('stage-swap');
+        h.classList.add('stage-flash');
       }
       lastFocusStage = stage;
 

@@ -44,6 +44,7 @@ body {
 
 header {
   margin-bottom: 2rem;
+  text-align: center;
 }
 
 header h1 {
@@ -272,16 +273,41 @@ header h1 {
 
 /* ── Focus mode ── */
 
+/* stage label matches the focus-list tasks (1rem / 400) but in caps */
+#focus-stage-label {
+  font-size: 1rem;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
 .focus-heading {
   font-family: var(--font);
   font-size: 1.4rem;
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 1.25rem;
+  max-height: 4rem;
+  transform-origin: left center;
 }
 
-.focus-heading.stage-swap {
-  animation: fade-slide 0.45s ease;
+/* flash in, swell, fade out — then .flash-done collapses the space */
+.focus-heading.stage-flash {
+  animation: stage-flash 1.8s ease forwards;
+}
+
+.focus-heading.flash-done {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, margin-bottom 0.35s ease;
+}
+
+@keyframes stage-flash {
+  0%   { opacity: 0; transform: scale(0.92); }
+  15%  { opacity: 1; transform: scale(1); }
+  70%  { opacity: 1; transform: scale(1.18); }
+  100% { opacity: 0; transform: scale(1.22); }
 }
 
 .focus-list .task-item {
@@ -917,11 +943,6 @@ header h1 {
   100% { opacity: 0;    transform: translateX(-50%) translateY(-30px); }
 }
 
-@keyframes fade-slide {
-  0%   { opacity: 0; transform: translateY(6px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
 /* ── Phone ── */
 
 @media (max-width: 600px) {
@@ -930,6 +951,4 @@ header h1 {
   .rail-mode { top: 1rem; left: 5.8rem; }
 
   .paper { padding-top: 4.75rem; }
-
-  header { text-align: center; }
 }
