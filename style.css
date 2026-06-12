@@ -36,7 +36,10 @@ body {
   max-width: 640px;
   margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh; /* iOS Safari: plain vh overshoots below the URL bar */
   padding: 3.5rem 2.5rem 9rem;
+  display: flex;
+  flex-direction: column;
 }
 
 header {
@@ -57,6 +60,8 @@ header h1 {
   font-size: 0.8rem;
   color: var(--ink);
   opacity: 0.45;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .hidden { display: none !important; }
@@ -830,7 +835,10 @@ header h1 {
   justify-content: center;
   align-items: flex-end;
   gap: 1.5rem 1.75rem;
-  margin: 3rem 0 1.5rem;
+  /* Pinned to the bottom of the viewport (.paper is a flex column);
+     long task lists push it further down naturally */
+  margin: auto 0 1.5rem;
+  padding-top: 3rem;
   color: var(--ink);
 }
 
@@ -912,4 +920,16 @@ header h1 {
 @keyframes fade-slide {
   0%   { opacity: 0; transform: translateY(6px); }
   100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Phone ── */
+
+@media (max-width: 600px) {
+  /* icon rail becomes a horizontal bar across the top */
+  .rail-mic  { top: 1rem; left: 3.4rem; }
+  .rail-mode { top: 1rem; left: 5.8rem; }
+
+  .paper { padding-top: 4.75rem; }
+
+  header { text-align: center; }
 }

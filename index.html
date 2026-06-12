@@ -211,10 +211,10 @@
      * CREATE POLICY "user owns plants" ON plants
      *   FOR ALL USING (auth.uid() = user_id);
      *
-     * v2 GARDEN (2026-06): every completed task waters every pot; hard tasks ALSO
-     * add a new pot first. stage is derived from water_count in the app
-     * (0 = pot + soil … 4 = fully grown), so no SQL changes are needed.
-     * seeds_pending is no longer used (column kept, ignored).
+     * v3 GARDEN (2026-06): every 3rd completed task (all-time count) earns a
+     * new pot; every completed task waters every pot (hard tasks water 3×).
+     * stage is derived from water_count in the app (0 = pot + soil … 4 = fully
+     * grown), so no SQL changes are needed. seeds_pending is unused (kept, ignored).
      */
 
     function getPendingCrossed() {
@@ -885,14 +885,18 @@
 
       taskCache = taskCache.filter(t => t.id !== task.id);
 
-      // NB: supabase query builders are thenables without .catch — use then(ok, err)
+      // NB: supabase query builders are thenables without .catch — use then(ok, err).
+      // onTaskCompleted runs after the update settles so its completed-task
+      // count includes this task (pot is earned on every 3rd completion).
       sb.from('tasks')
         .update({ crossed_off: true, completed_at: new Date().toISOString() })
         .eq('id', task.id)
-        .then(({ error }) => { if (!error) removePendingCrossed(task.id); }, () => {});
+        .then(
+          ({ error }) => { if (!error) removePendingCrossed(task.id); onTaskCompleted(isHard); },
+          () => onTaskCompleted(isHard)
+        );
 
       setTimeout(() => fadeOut(li, () => { li.remove(); onTasksChanged(); }), 500);
-      onTaskCompleted(isHard);
     }
 
     function fadeOut(li, cb) {
@@ -1443,8 +1447,8 @@
     });
 
     // ── Garden ────────────────────────────────────────────────────────────────
-    // Any task done → every unfinished plant gets watered and grows a little.
-    // Hard task done → a new pot (with soil) also joins the garden first.
+    // Any task done → every unfinished plant gets watered (hard tasks water 3×).
+    // Every 3rd completed task → a new pot (with soil) joins the garden first.
 
     function renderGarden() {
       const area = document.getElementById('garden-area');
@@ -1508,7 +1512,7 @@
       } catch (e) { console.warn('addPlant failed:', e); }
     }
 
-    async function waterGarden() {
+    async function waterGarden(amount = 1) {
       // Whole garden fully grown — the completed task earns a fresh pot instead
       if (!garden.some(p => p.stage < MAX_STAGE)) {
         await addPlant(true);
@@ -1518,7 +1522,7 @@
       const changed = [];
       garden.forEach(p => {
         if (p.stage >= MAX_STAGE) return;
-        p.water_count += 1;
+        p.water_count += amount;
         const newStage = Math.min(MAX_STAGE, Math.floor(p.water_count / WATERS_PER_STAGE));
         changed.push({ plant: p, didGrow: newStage > p.stage });
         p.stage = newStage;
@@ -1537,12 +1541,23 @@
       } catch (e) { console.warn('waterGarden failed:', e); }
     }
 
+    const TASKS_PER_POT = 3;
+    const HARD_WATER    = 3;
+
     async function onTaskCompleted(isHard) {
       if (!userId) return;
-      // Await so the new pot exists before watering — otherwise waterGarden's
-      // all-grown fallback would add a second pot for the same task.
-      if (isHard) await addPlant(true);
-      await waterGarden();
+      // Every 3rd completed task (all-time, counted in the DB so it works
+      // across days and devices) earns a new pot.
+      try {
+        const { count } = await sb.from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('crossed_off', true);
+        // Await so the new pot exists before watering — otherwise waterGarden's
+        // all-grown fallback would add a second pot for the same task.
+        if (count && count % TASKS_PER_POT === 0) await addPlant(true);
+      } catch (e) { console.warn('pot count failed:', e); }
+      await waterGarden(isHard ? HARD_WATER : 1);
     }
 
     async function loadGarden() {
