@@ -11,8 +11,17 @@
 <body>
   <div class="paper-overlay"></div>
 
-  <!-- Fixed top-left icon -->
+  <!-- Fixed top-left rail -->
   <button id="account-btn" class="account-btn" title="your profile"></button>
+  <button id="rail-mic-btn" class="rail-btn rail-mic" title="brain dump">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <rect x="9" y="2" width="6" height="12" rx="3"/>
+      <path d="M5 10a7 7 0 0 0 14 0"/>
+      <line x1="12" y1="17" x2="12" y2="21"/>
+      <line x1="9" y1="21" x2="15" y2="21"/>
+    </svg>
+  </button>
+  <button id="rail-mode-btn" class="rail-btn rail-mode" title="switch view"></button>
 
   <!-- Profile overlay -->
   <div id="profile-overlay" class="profile-overlay hidden">
@@ -50,17 +59,6 @@
       <p class="header-date" id="header-date"></p>
     </header>
 
-    <!-- Brain dump entry -->
-    <button id="braindump-link" class="braindump-link">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-        <rect x="9" y="2" width="6" height="12" rx="3"/>
-        <path d="M5 10a7 7 0 0 0 14 0"/>
-        <line x1="12" y1="17" x2="12" y2="21"/>
-        <line x1="9" y1="21" x2="15" y2="21"/>
-      </svg>
-      brain dump
-    </button>
-
     <!-- Grid view: full 4-quadrant board (before accepting the day, or peeking) -->
     <div id="grid-view">
       <div class="board-section">
@@ -92,7 +90,6 @@
 
       <div class="grid-actions">
         <button id="accept-day-btn" class="accept-day-btn hidden">start my day →</button>
-        <button id="back-to-focus-btn" class="back-to-focus-btn hidden">← back to focus</button>
       </div>
     </div>
 
@@ -102,7 +99,6 @@
       <h2 class="focus-heading" id="focus-heading"></h2>
       <ul class="board-list focus-list" id="focus-list"></ul>
       <p class="focus-progress" id="focus-progress"></p>
-      <button class="view-all-link" id="view-all-link">view all</button>
     </div>
 
     <!-- Done view -->
@@ -119,7 +115,6 @@
         <ul class="board-list" id="fl-hard-later"></ul>
       </div>
       <p id="celebrate-msg" class="celebrate-msg hidden">you did it — your garden grew today.</p>
-      <button class="view-all-link" id="view-all-link-done">view all</button>
     </div>
 
     <!-- Garden -->
@@ -215,9 +210,10 @@
      * CREATE POLICY "user owns plants" ON plants
      *   FOR ALL USING (auth.uid() = user_id);
      *
-     * v2 GARDEN (2026-06): each hard task adds a new pot; easy tasks water every pot.
-     * stage is now derived from water_count in the app (0 = pot + soil … 4 = fully grown),
-     * so no SQL changes are needed. seeds_pending is no longer used (column kept, ignored).
+     * v2 GARDEN (2026-06): every completed task waters every pot; hard tasks ALSO
+     * add a new pot first. stage is derived from water_count in the app
+     * (0 = pot + soil … 4 = fully grown), so no SQL changes are needed.
+     * seeds_pending is no longer used (column kept, ignored).
      */
 
     function getPendingCrossed() {
@@ -267,7 +263,8 @@
 
     // ── DOM refs ──────────────────────────────────────────────────────────────
 
-    const braindumpLink  = document.getElementById('braindump-link');
+    const railMicBtn     = document.getElementById('rail-mic-btn');
+    const railModeBtn    = document.getElementById('rail-mode-btn');
     const accountBtn     = document.getElementById('account-btn');
     const profileOverlay = document.getElementById('profile-overlay');
     const profileClose   = document.getElementById('profile-close');
@@ -687,7 +684,6 @@
         const ul = document.getElementById(`bl-${q}`);
         buckets[q].forEach(t => ul.appendChild(makeTask(t)));
       });
-      document.getElementById('grid-empty-hint').classList.toggle('hidden', taskCache.length > 0);
       initSortables();
     }
 
@@ -759,12 +755,21 @@
       if (showGrid) {
         renderGrid();
         document.getElementById('accept-day-btn').classList.toggle('hidden', accepted || taskCache.length === 0);
-        document.getElementById('back-to-focus-btn').classList.toggle('hidden', !accepted);
       } else if (stage !== 'done') {
         renderFocus(stage);
       } else {
         renderDone(doneChoice);
       }
+      updateRailModeBtn(showGrid);
+    }
+
+    // Rail icon shows the view you'd switch TO: in grid → focus icon (circled
+    // dot), in focus/done → grid icon (four squares).
+    function updateRailModeBtn(showingGrid) {
+      railModeBtn.innerHTML = showingGrid
+        ? '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="10" cy="10" r="7.5"/><circle cx="10" cy="10" r="2" fill="currentColor" stroke="none"/></svg>'
+        : '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="5.5" height="5.5" rx="1"/><rect x="11.5" y="3" width="5.5" height="5.5" rx="1"/><rect x="3" y="11.5" width="5.5" height="5.5" rx="1"/><rect x="11.5" y="11.5" width="5.5" height="5.5" rx="1"/></svg>';
+      railModeBtn.title = showingGrid ? 'focus mode' : 'see the whole board';
     }
 
     function onTasksChanged() {
@@ -811,16 +816,17 @@
       renderView();
     });
 
-    document.getElementById('back-to-focus-btn').addEventListener('click', () => {
-      peekingGrid = false;
-      renderView();
-    });
-
-    document.querySelectorAll('.view-all-link').forEach(btn => {
-      btn.addEventListener('click', () => {
+    railModeBtn.addEventListener('click', () => {
+      const { accepted } = getDayState();
+      if (!accepted || peekingGrid) {
+        // currently in grid → enter focus (accepting the day if needed)
+        if (!accepted) setDayState({ accepted: true });
+        peekingGrid = false;
+      } else {
+        // currently in focus/done → peek at the whole board
         peekingGrid = true;
-        renderView();
-      });
+      }
+      renderView();
     });
 
     document.getElementById('done-tomorrow-btn').addEventListener('click', () => {
@@ -878,10 +884,11 @@
 
       taskCache = taskCache.filter(t => t.id !== task.id);
 
-      sb.from('tasks').update({ crossed_off: true }).eq('id', task.id)
-        .then(() => removePendingCrossed(task.id))
-        .catch(() => {});
-      sb.from('tasks').update({ completed_at: new Date().toISOString() }).eq('id', task.id).catch(() => {});
+      // NB: supabase query builders are thenables without .catch — use then(ok, err)
+      sb.from('tasks')
+        .update({ crossed_off: true, completed_at: new Date().toISOString() })
+        .eq('id', task.id)
+        .then(({ error }) => { if (!error) removePendingCrossed(task.id); }, () => {});
 
       setTimeout(() => fadeOut(li, () => { li.remove(); onTasksChanged(); }), 500);
       onTaskCompleted(isHard);
@@ -1292,7 +1299,7 @@
       document.getElementById('bd-review-list').innerHTML = '';
     }
 
-    braindumpLink.addEventListener('click', openBraindump);
+    railMicBtn.addEventListener('click', openBraindump);
     braindumpClose.addEventListener('click', closeBraindump);
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && !braindumpOverlay.classList.contains('hidden')) closeBraindump();
@@ -1380,8 +1387,8 @@
     });
 
     // ── Garden ────────────────────────────────────────────────────────────────
-    // Hard task done → a new pot (with soil) joins the garden.
-    // Easy task done → every unfinished plant gets watered and grows a little.
+    // Any task done → every unfinished plant gets watered and grows a little.
+    // Hard task done → a new pot (with soil) also joins the garden first.
 
     function renderGarden() {
       const area = document.getElementById('garden-area');
@@ -1433,19 +1440,20 @@
       if (!userId) return;
       const species = PLANT_SPECIES[Math.floor(Math.random() * PLANT_SPECIES.length)];
       try {
-        const { data } = await sb.from('plants')
+        const { data, error } = await sb.from('plants')
           .insert({ user_id: userId, species, stage: 0, water_count: 0, seeds_pending: 0, is_collected: false })
           .select().single();
+        if (error) console.warn('addPlant failed:', error.message);
         if (data) {
           garden.push(data);
           renderGarden();
           if (animate) animatePot(data.id, false, true);
         }
-      } catch (e) {}
+      } catch (e) { console.warn('addPlant failed:', e); }
     }
 
     async function waterGarden() {
-      // Whole garden fully grown — an easy task earns a fresh pot instead
+      // Whole garden fully grown — the completed task earns a fresh pot instead
       if (!garden.some(p => p.stage < MAX_STAGE)) {
         await addPlant(true);
         return;
@@ -1464,18 +1472,21 @@
       changed.forEach(c => animatePot(c.plant.id, c.didGrow, false));
 
       try {
-        await Promise.all(changed.map(c =>
+        const results = await Promise.all(changed.map(c =>
           sb.from('plants')
             .update({ water_count: c.plant.water_count, stage: c.plant.stage })
             .eq('id', c.plant.id)
         ));
-      } catch (e) {}
+        results.forEach(r => { if (r.error) console.warn('waterGarden update failed:', r.error.message); });
+      } catch (e) { console.warn('waterGarden failed:', e); }
     }
 
-    function onTaskCompleted(isHard) {
+    async function onTaskCompleted(isHard) {
       if (!userId) return;
-      if (isHard) addPlant(true);
-      else waterGarden();
+      // Await so the new pot exists before watering — otherwise waterGarden's
+      // all-grown fallback would add a second pot for the same task.
+      if (isHard) await addPlant(true);
+      await waterGarden();
     }
 
     async function loadGarden() {

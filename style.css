@@ -61,9 +61,10 @@ header h1 {
 
 .hidden { display: none !important; }
 
-/* ── Fixed icon button (top-left) ── */
+/* ── Fixed icon rail (top-left) ── */
 
 .account-btn,
+.rail-btn,
 .profile-close {
   position: fixed;
   top: 1rem;
@@ -79,7 +80,11 @@ header h1 {
   display: block;
 }
 
-.account-btn:hover { opacity: 0.85; }
+.rail-mic  { top: 3.4rem; }
+.rail-mode { top: 5.8rem; }
+
+.account-btn:hover,
+.rail-btn:hover { opacity: 0.85; }
 
 .profile-close {
   z-index: 201;
@@ -239,16 +244,6 @@ header h1 {
   min-height: 1.2rem;
 }
 
-.grid-empty-hint {
-  font-family: var(--font);
-  font-size: 0.8rem;
-  color: var(--ink);
-  opacity: 0.5;
-  line-height: 1.6;
-  max-width: 380px;
-  margin-bottom: 1.5rem;
-}
-
 .grid-actions {
   display: flex;
   align-items: center;
@@ -269,21 +264,6 @@ header h1 {
 }
 
 .accept-day-btn:hover { opacity: 0.85; }
-
-.back-to-focus-btn {
-  background: none;
-  border: none;
-  font-family: var(--font);
-  font-size: 0.75rem;
-  color: var(--ink);
-  opacity: 0.4;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-  padding: 0;
-}
-
-.back-to-focus-btn:hover { opacity: 0.75; }
 
 /* ── Focus mode ── */
 
@@ -311,22 +291,6 @@ header h1 {
   opacity: 0.4;
   margin-top: 1rem;
 }
-
-.view-all-link {
-  background: none;
-  border: none;
-  font-family: var(--font);
-  font-size: 0.7rem;
-  color: var(--ink);
-  opacity: 0.35;
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0;
-  margin-top: 1.75rem;
-  display: inline-block;
-}
-
-.view-all-link:hover { opacity: 0.7; }
 
 /* ── Done view ── */
 
@@ -546,27 +510,6 @@ header h1 {
   border-top: 1px solid rgba(var(--ink-rgb), 0.1);
   margin: 0.25rem 0;
 }
-
-/* ── Brain dump link ── */
-
-.braindump-link {
-  background: rgba(var(--ink-rgb), 0.04);
-  border: 1px solid rgba(var(--ink-rgb), 0.25);
-  border-radius: 999px;
-  font-family: var(--font);
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ink);
-  cursor: pointer;
-  padding: 0.55rem 1.05rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-bottom: 2rem;
-  letter-spacing: 0.02em;
-}
-
-.braindump-link:hover { background: rgba(var(--ink-rgb), 0.09); }
 
 /* ── Brain dump overlay ── */
 
