@@ -524,8 +524,22 @@ header h1 {
 .braindump-header {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 1.1rem;
   margin-bottom: 1.25rem;
 }
+
+.bd-voice-btn {
+  background: none;
+  border: none;
+  color: var(--ink);
+  opacity: 0.35;
+  cursor: pointer;
+  padding: 0;
+  line-height: 0;
+}
+
+.bd-voice-btn:hover { opacity: 0.75; }
 
 .braindump-close {
   background: none;

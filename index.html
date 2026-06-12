@@ -144,6 +144,7 @@
   <div id="braindump-overlay" class="braindump-overlay hidden">
     <div class="paper">
       <div class="braindump-header">
+        <button id="bd-voice-btn" class="bd-voice-btn" title="voice replies"></button>
         <button id="braindump-close" class="braindump-close">×</button>
       </div>
 
@@ -1166,6 +1167,8 @@
 
     function startRecording() {
       if (!recognition && !initSpeech()) return;
+      // Stop talking before listening — the mic would transcribe our own voice
+      if ('speechSynthesis' in window) speechSynthesis.cancel();
       finalTranscript = bdChatInput.value;
       isRecording = true;
       try { recognition.start(); } catch(e) {}
@@ -1186,6 +1189,57 @@
       else startRecording();
     });
 
+    // ── Spoken replies (speechSynthesis) ──────────────────────────────────────
+
+    const hasTTS = 'speechSynthesis' in window;
+    let voiceOn  = localStorage.getItem('bd-voice') !== 'off';
+    let bdVoice  = null;
+
+    function pickVoice() {
+      const voices = speechSynthesis.getVoices().filter(v => v.lang && v.lang.startsWith('en'));
+      if (!voices.length) return null;
+      // Most platforms bury their best voice; prefer known-good ones by name
+      const prefer = ['Samantha', 'Google US English', 'Aria', 'Zira', 'Karen', 'Moira'];
+      for (const name of prefer) {
+        const v = voices.find(v => v.name.includes(name));
+        if (v) return v;
+      }
+      return voices.find(v => v.default) || voices[0];
+    }
+
+    if (hasTTS) {
+      bdVoice = pickVoice();
+      speechSynthesis.onvoiceschanged = () => { bdVoice = pickVoice(); };
+    }
+
+    function speak(text) {
+      if (!hasTTS || !voiceOn) return;
+      const clean = text.replace(/TASKS:\s*\[[\s\S]*?\]/g, '').trim();
+      if (!clean) return;
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(clean);
+      if (bdVoice) u.voice = bdVoice;
+      speechSynthesis.speak(u);
+    }
+
+    const bdVoiceBtn = document.getElementById('bd-voice-btn');
+    const VOICE_ON_SVG  = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+    const VOICE_OFF_SVG = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg>';
+
+    function updateVoiceBtn() {
+      bdVoiceBtn.innerHTML = voiceOn ? VOICE_ON_SVG : VOICE_OFF_SVG;
+      bdVoiceBtn.title = voiceOn ? 'voice replies: on' : 'voice replies: off';
+    }
+    updateVoiceBtn();
+    if (!hasTTS) bdVoiceBtn.style.display = 'none';
+
+    bdVoiceBtn.addEventListener('click', () => {
+      voiceOn = !voiceOn;
+      localStorage.setItem('bd-voice', voiceOn ? 'on' : 'off');
+      if (!voiceOn && hasTTS) speechSynthesis.cancel();
+      updateVoiceBtn();
+    });
+
     // ── Chat UI ───────────────────────────────────────────────────────────────
 
     function appendMessage(role, text) {
@@ -1195,6 +1249,7 @@
       div.textContent = text.replace(/TASKS:\s*\[[\s\S]*?\]/g, '').trim();
       bdChatMessages.appendChild(div);
       bdChatMessages.scrollTop = bdChatMessages.scrollHeight;
+      if (role !== 'user') speak(text);
     }
 
     function setTyping(on) {
@@ -1287,6 +1342,7 @@
 
     function closeBraindump() {
       stopRecording();
+      if (hasTTS) speechSynthesis.cancel();
       braindumpOverlay.classList.add('hidden');
       bdPhaseResults.classList.add('hidden');
       bdPhaseInput.classList.remove('hidden');
