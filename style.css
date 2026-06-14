@@ -876,26 +876,37 @@ header h1 {
 }
 
 .plant-growth {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  min-height: 10px;
   line-height: 0;
-  margin-bottom: -5px;  /* stems sit in the soil row of the pot */
 }
 
-.plant-wrap > svg { display: block; }
-
-.plant-wrap.pulsing {
-  animation: pot-pulse 0.42s ease;
+/* Hand-drawn frames (pot baked in) — fixed box, bottom-aligned so the pot stays
+   put while the plant grows taller within the 256×256 canvas. */
+.plant-img {
+  display: block;
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  object-position: bottom center;
+  image-rendering: pixelated;
 }
+
+/* New frame fades in over the old one on each grow */
+.plant-img.fading-in {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.plant-img.fading-in.shown { opacity: 1; }
 
 .plant-wrap.sprouting {
   animation: pot-in 0.5s ease;
-}
-
-.plant-growth.growing {
-  animation: plant-grow 0.55s ease;
 }
 
 .plant-droplet {
@@ -923,19 +934,9 @@ header h1 {
   animation: float-up 0.9s ease forwards;
 }
 
-@keyframes pot-pulse {
-  0%, 100% { transform: scale(1); }
-  35%       { transform: scale(1.11); }
-}
-
 @keyframes pot-in {
   0%   { opacity: 0; transform: scale(0.6); }
   100% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes plant-grow {
-  0%   { opacity: 0.2; transform: scaleY(0.75); transform-origin: bottom center; }
-  100% { opacity: 1;   transform: scaleY(1);    transform-origin: bottom center; }
 }
 
 @keyframes float-up {

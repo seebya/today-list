@@ -287,130 +287,32 @@
 
     // ── Garden state ──────────────────────────────────────────────────────────
     let garden = [];
-    const PLANT_SPECIES = ['fern', 'succulent', 'grass'];
-    const WATERS_PER_STAGE = 2;
-    const MAX_STAGE = 4;
+    const PLANT_SPECIES = ['sapling', 'flower', 'monstera'];
+    const WATERS_PER_STAGE = 1;  // 1 water = next drawn frame
 
-    // Pixel-art rendering: grids of characters → SVG squares
-    function pixSVG(rows, colors, scale = 5) {
-      const h = rows.length;
-      const w = Math.max(...rows.map(r => r.length));
-      let rects = '';
-      rows.forEach((row, y) => {
-        [...row].forEach((ch, x) => {
-          const c = colors[ch];
-          if (c) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`;
-        });
-      });
-      return `<svg viewBox="0 0 ${w} ${h}" width="${w * scale}" height="${h * scale}" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+    // Hand-drawn plants: ordered PNG frames per species (pot baked into each frame).
+    // stage = index into the frame list; last frame = fully grown.
+    const PLANT_FRAMES = {
+      sapling:  ['IMG_4864','IMG_4865','IMG_4867','IMG_4868','IMG_4870','IMG_4871','IMG_4873'],
+      flower:   ['IMG_4879','IMG_4880','IMG_4881','IMG_4882','IMG_4883','IMG_4884','IMG_4885',
+                 'IMG_4886','IMG_4887','IMG_4888','IMG_4889','IMG_4890','IMG_4891','IMG_4892',
+                 'IMG_4893','IMG_4894','IMG_4896','IMG_4898'],
+      monstera: ['IMG_4905','IMG_4907','IMG_4908','IMG_4912','IMG_4913','IMG_4914',
+                 'IMG_4927','IMG_4928','IMG_4929'],
+    };
+
+    function maxStage(species) {
+      return (PLANT_FRAMES[species] || PLANT_FRAMES.sapling).length - 1;
     }
 
-    const PLANT_COLORS = {
-      g: '#3e8e41',  // green
-      l: '#79c879',  // light green
-      y: '#f4c542',  // yellow
-      o: '#e8842c',  // orange
-      w: '#fdf6ec',  // white petal
-    };
-
-    const POT_STYLES = {
-      fern:      { p: '#bf6a3a', P: '#8f4a22', s: '#4a332a' },  // terracotta
-      succulent: { p: '#e3d4b6', P: '#bfa888', s: '#4a332a' },  // cream
-      grass:     { p: '#9c6b53', P: '#74462f', s: '#4a332a' },  // brown
-    };
-
-    const POT_ROWS = [
-      '...ssssssss...',
-      '..pppppppppp..',
-      '..pppppppppp..',
-      '...pppppppp...',
-      '...pppppppp...',
-      '...pppppppp...',
-      '....pppppp....',
-      '....PPPPPP....',
-    ];
-
-    function potSVG(species) {
-      return pixSVG(POT_ROWS, POT_STYLES[species] || POT_STYLES.fern);
+    function frameSrc(species, stage) {
+      const f = PLANT_FRAMES[species] || PLANT_FRAMES.sapling;
+      const name = f[Math.min(Math.max(stage, 0), f.length - 1)] || f[0];
+      return `Plants/${name}.PNG`;
     }
 
-    // stage 0 = empty pot with soil (no foliage); stages 1–4 = growth
-    const PLANT_PIX = {
-      fern: [
-        null,
-        [ '......gg......',
-          '......gg......' ],
-        [ '....l....l....',
-          '.....g..g.....',
-          '......gg......',
-          '......gg......' ],
-        [ '..l........l..',
-          '...g......g...',
-          '....g.ll.g....',
-          '.....gggg.....',
-          '......gg......',
-          '......gg......' ],
-        [ '.l...l..l...l.',
-          '..g...gg...g..',
-          '..g...gg...g..',
-          '...g..gg..g...',
-          '....g.gg.g....',
-          '.....gggg.....',
-          '......gg......',
-          '......gg......' ],
-      ],
-      succulent: [
-        null,
-        [ '.....gggg.....',
-          '.....glgg.....' ],
-        [ '.....gggg.....',
-          '.....glgg.....',
-          '.....glgg.....',
-          '.....gggg.....' ],
-        [ '.....gggg.....',
-          '.....glgg.....',
-          '.gg..glgg..gg.',
-          '.gg..glgg..gg.',
-          '.gggggggggggg.',
-          '.....gggg.....' ],
-        [ '......yy......',
-          '.....yooy.....',
-          '.....gggg.....',
-          '.....glgg.....',
-          '.gg..glgg..gg.',
-          '.gg..glgg..gg.',
-          '.gggggggggggg.',
-          '.....gggg.....' ],
-      ],
-      grass: [
-        null,
-        [ '......ll......',
-          '......gg......' ],
-        [ '......gg......',
-          '...g..gg..g...',
-          '....g.gg.g....',
-          '......gg......' ],
-        [ '......oo......',
-          '......gg......',
-          '...g..gg..g...',
-          '....g.gg.g....',
-          '......gg......',
-          '......gg......' ],
-        [ '.....wwww.....',
-          '....wyyyyw....',
-          '....wyyyyw....',
-          '.....wwww.....',
-          '......gg......',
-          '...g..gg..g...',
-          '....g.gg.g....',
-          '......gg......' ],
-      ],
-    };
-
-    function plantSVG(species, stage) {
-      const s = PLANT_PIX[species] || PLANT_PIX.fern;
-      const rows = s[Math.min(stage, MAX_STAGE)];
-      return rows ? pixSVG(rows, PLANT_COLORS) : '';
+    function plantImg(species, stage) {
+      return `<img class="plant-img" src="${frameSrc(species, stage)}" alt="" draggable="false">`;
     }
 
     // ── Icon UI ───────────────────────────────────────────────────────────────
@@ -1463,7 +1365,7 @@
         const wrap = document.createElement('div');
         wrap.className = 'plant-wrap';
         wrap.dataset.plantId = p.id;
-        wrap.innerHTML = `<div class="plant-growth">${plantSVG(p.species, p.stage)}</div>${potSVG(p.species)}`;
+        wrap.innerHTML = `<div class="plant-growth">${plantImg(p.species, p.stage)}</div>`;
         area.appendChild(wrap);
       });
     }
@@ -1483,20 +1385,25 @@
         return;
       }
 
-      wrap.classList.add('pulsing');
-      setTimeout(() => wrap.classList.remove('pulsing'), 420);
-
       const drop = document.createElement('div');
       drop.className = 'plant-droplet';
       drop.textContent = '·';
       wrap.appendChild(drop);
       setTimeout(() => drop.remove(), 650);
 
+      // Crossfade: overlay the new frame above the old one and fade it in.
       if (didGrow) {
+        const plant = garden.find(p => String(p.id) === String(plantId));
         const growth = wrap.querySelector('.plant-growth');
-        if (growth) {
-          growth.classList.add('growing');
-          setTimeout(() => growth.classList.remove('growing'), 550);
+        if (plant && growth) {
+          const next = document.createElement('img');
+          next.className = 'plant-img fading-in';
+          next.src = frameSrc(plant.species, plant.stage);
+          next.alt = '';
+          next.draggable = false;
+          growth.appendChild(next);
+          requestAnimationFrame(() => next.classList.add('shown'));
+          setTimeout(() => { growth.innerHTML = plantImg(plant.species, plant.stage); }, 520);
         }
       }
     }
@@ -1519,21 +1426,23 @@
 
     async function waterGarden(amount = 1) {
       // Whole garden fully grown — the completed task earns a fresh pot instead
-      if (!garden.some(p => p.stage < MAX_STAGE)) {
+      if (!garden.some(p => p.stage < maxStage(p.species))) {
         await addPlant(true);
         return;
       }
 
       const changed = [];
       garden.forEach(p => {
-        if (p.stage >= MAX_STAGE) return;
+        const max = maxStage(p.species);
+        if (p.stage >= max) return;
         p.water_count += amount;
-        const newStage = Math.min(MAX_STAGE, Math.floor(p.water_count / WATERS_PER_STAGE));
+        const newStage = Math.min(max, Math.floor(p.water_count / WATERS_PER_STAGE));
         changed.push({ plant: p, didGrow: newStage > p.stage });
         p.stage = newStage;
       });
 
-      renderGarden();
+      // animatePot crossfades from the on-screen frame to the new one, so we
+      // don't renderGarden() here (that would replace the old frame first).
       changed.forEach(c => animatePot(c.plant.id, c.didGrow, false));
 
       try {
@@ -1578,7 +1487,7 @@
           garden = data;
           // Stage is derived from water_count — auto-migrates pre-garden plants
           garden.forEach(p => {
-            p.stage = Math.min(MAX_STAGE, Math.floor(p.water_count / WATERS_PER_STAGE));
+            p.stage = Math.min(maxStage(p.species), Math.floor(p.water_count / WATERS_PER_STAGE));
           });
           renderGarden();
         } else {
